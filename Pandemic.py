@@ -1,5 +1,12 @@
+# -*- coding: utf-8 -*-
+# <nbformat>3.0</nbformat>
+
+
+
 import numpy as np
 import operator
+#Notes: this project will require a neural network- or carefully programmed weights- for each Role's AI to learn and adapt.  I'm not sure where to start with that...
+#players will need to be aware of the number of cards of each color remaining in the deck, in all players' hands, and in the discard pile, and be aware of when they've hit their limit.
 
 
 
@@ -98,66 +105,64 @@ NEXTSTEP = 1
 STEPS = 2
 NEIGHBORING = 1
 
-
-#need to rework how neighboring cities are stored; they should be stored as a city, the node to travel to from the current node to get there, and how many steps are between the two.
-#[cityIndex, cityIndexNext, totalSteps]
-#ex. Atlanta = [BLUE, 0,0,0,0, 1, [[CHICAGO, CHICAGO, 0], [WASHINGTON,WASHINGTON, 0], [MIAMI, MIAMI, 0]]
-
-#City name = [Color, Disease tokens (Blue, Yellow, Black, Red), Research Station, Connected Cities by index)
-Atlanta =       [BLUE,   0,0,0,0, 1, [[ATLANTA, ATLANTA, 0], [CHICAGO, CHICAGO, 1], [WASHINGTON, WASHINGTON, 1], [MIAMI, MIAMI, 1]]
-Washington =    [BLUE,   0,0,0,0, 0, [[WASHINGTON, WASHINGTON, 0], [ATLANTA, ATLANTA, 1], [MONTREAL, MONTREAL, 1], [NEWYORK, NEWYORK, 1]]
-SanFransisco =  [BLUE,   0,0,0,0, 0, [[SANFRANCISCO, SANFRANCISCO, 0], [TOKYO, TOKYO, 1] [MANILA, MANILA, 1] [LOSANGELES, LOSANGELES, 1], [CHICAGO, CHICAGO, 1]]
-Chicago =       [BLUE,   0,0,0,0, 0, [[CHICAGO, CHICAGO, 0], [SANFRANCISCO, SANFRANCISCO, 1], [LOSANGELES, LOSANGELES, 1], [MEXICOCITY, MEXICOCITY, 1], [ATLANTA, ATLANTA, 1], [MONTREAL, MONTREAL, 1]]
-Montreal =      [BLUE,   0,0,0,0, 0, [[MONTREAL, MONTREAL, 0], [CHICAGO, CHICAGO, 1], [WASHINGTON, WASHINGTON, 1], [NEWYORK, NEWYORK, 1]]
-NewYork =       [BLUE,   0,0,0,0, 0, [[NEWYORK, NEWYORK, 0], [MONTREAL, MONTREAL, 1], [WASHINGTON, WASHINGTON, 1], [LONDON, LONDON, 1], [MADRID, MADRID, 1]]
-London =        [BLUE,   0,0,0,0, 0, [[LONDON, LONDON, 0], [NEWYORK, NEWYORK, 1], [MADRID, MADRID, 1], [PARIS, PARIS, 1], [ESSEN, ESSEN, 1]]
-Madrid =        [BLUE,   0,0,0,0, 0, [[MADRID, MADRID, 0], [NEWYORK, NEWYORK, 1], [LONDON, LONDON, 1], [SAOPAULO, SAOPAULO, 1], [ALGIERS, ALGIERS, 1], [PARIS, PARIS, 1]]
-Paris =         [BLUE,   0,0,0,0, 0, [[[PARIS, PARIS, 0], [MADRID, MADRID, 1], [LONDON, LONDON, 1], [ESSEN, ESSEN, 1], [MILAN, MILAN, 1], [ALGIERS, ALGIERS, 1]]
-Essen =         [BLUE,   0,0,0,0, 0, [[ESSEN, ESSEN, 0], [LONDON, LONDON, 1], [PARIS, PARIS, 1], [MILAN, MILAN, 1], [STPETERSBURG, STPETERSBURG, 1]]
-Milan =         [BLUE,   0,0,0,0, 0, [[MILAN, MILAN, 0], [ESSEN, ESSEN, 1], [PARIS, PARIS, 1], [ISTANBUL, ISTANBUL, 1]]
-StPetersburg =  [BLUE,   0,0,0,0, 0, [[STPETERSBURG, STPETERSBURG, 0], [ESSEN, ESSEN, 1], [ISTANBUL, ISTANBUL, 1], [MOSCOW, MOSCOW, 1]]
-LosAngeles =    [YELLOW, 0,0,0,0, 0, [[LOSANGELES, LOSANGELES, 0], [SANFRANCISCO, SANFRANCISCO, 1], [CHICAGO, CHICAGO, 1], [MEXICOCITY, MEXICOCITY, 1], [SYDNEY, SYDNEY, 1]]
-MexicoCity =    [YELLOW, 0,0,0,0, 0, [[MEXICOCITY, MEXICOCITY, 0], [LOSANGELES, LOSANGELES, 1], [CHICAGO, CHICAGO, 1], [MIAMI, MIAMI, 1], [LIMA, LIMA, 1], [BOGOTA, BOGOTA, 1]]
-Miami =         [YELLOW, 0,0,0,0, 0, [[MIAMI, MIAMI, 0], [MEXICOCITY, MEXICOCITY, 1], [BOGOTA, BOGOTA, 1], [ATLANTA, ATLANTA, 1], [WASHINGTON, WASHINGTON, 1]]
-Bogota =        [YELLOW, 0,0,0,0, 0, [[BOGOTA, BOGOTA, 0], [MEXICOCITY, MEXICOCITY, 1], [LIMA, LIMA, 1], [BUENOSAIRES, BUENOSAIRES, 1], [SAOPAULO, SAOPAULO, 1], [MIAMI, MIAMI, 1]]
-Lima =          [YELLOW, 0,0,0,0, 0, [[LIMA, LIMA, 0], [MEXICOCITY, MEXICOCITY, 1], [BOGOTA, BOGOTA, 1], [SANTIAGO, SANTIAGO, 1]]
-Santiago =      [YELLOW, 0,0,0,0, 0, [[SANTIAGO, SANTIAGO, 0], [LIMA, LIMA, 1]]
-BuenosAires =   [YELLOW, 0,0,0,0, 0, [[BUENOSAIRES, BUENOSAIRES, 0], [BOGOTA, BOGOTA, 1], [SAOPAULO, SAOPAULO, 1]]
-SaoPaulo =      [YELLOW, 0,0,0,0, 0, [[SAOPAULO, SAOPAULO, 0], [BOGOTA, BOGOTA, 1], [BUENOSAIRES, BUENOSAIRES, 1], [MADRID, MADRID, 1], [LAGOS, LAGOS, 1]]
-Lagos =         [YELLOW, 0,0,0,0, 0, [[LAGOS, LAGOS, 0], [SAOPAULO, SAOPAULO, 1], [KINSASHA, KINSASHA, 1], [KHARTOUM, KHARTOUM, 1]]
-Kinsasha =      [YELLOW, 0,0,0,0, 0, [[KINSASHA, KINSASHA, 0], [LAGOS, LAGOS, 1], [KHARTOUM, KHARTOUM, 1], [JOHANNESBURG, JOHANNESBURG, 1]]
-Johannesburg =  [YELLOW, 0,0,0,0, 0, [[JOHANNESBURG, JOHANNESBURG, 0], [KHARTOUM, KHARTOUM, 1], [KINSASHA, KINSASHA, 1]]
-Khartoum =      [YELLOW, 0,0,0,0, 0, [[KHARTOUM, KHARTOUM, 0], [LAGOS, LAGOS, 1], [KINSASHA, KINSASHA, 1], [JOHANNESBURG, JOHANNESBURG, 1], [CAIRO, CAIRO, 1]]
-Algiers =       [BLACK,  0,0,0,0, 0, [[ALGIERS, ALGIERS, 0], [MADRID, MADRID, 1], [PARIS, PARIS, 1], [ISTANBUL, ISTANBUL, 1], [CAIRO, CAIRO, 1]]
-Cairo =         [BLACK,  0,0,0,0, 0, [[CAIRO, CAIRO, 0], [ALGIERS, ALGIERS, 1], [KHARTOUM, KHARTOUM, 1], [ISTANBUL, ISTANBUL, 1], [BAGHDAD, BAGHDAD, 1], [RIYADH, RIYADH, 1]]
-Istanbul =      [BLACK,  0,0,0,0, 0, [[ISTANBUL, ISTANBUL, 0], [MILAN, MILAN, 1], [ALGIERS, ALGIERS, 1], [CAIRO, CAIRO, 1], [BAGHDAD, BAGHDAD, 1], [MOSCOW, MOSCOW, 1], [STPETERSBURG, STPETERSBURG, 1]]
-Moscow =        [BLACK,  0,0,0,0, 0, [[MOSCOW, MOSCOW, 0], [STPETERSBURG, STPETERSBURG, 1], [ISTANBUL, ISTANBUL, 1], [TEHRAN, TEHRAN, 1]]
-Baghdad =       [BLACK,  0,0,0,0, 0, [[BAGHDAD, BAGHDAD, 0], [ISTANBUL, ISTANBUL, 1], [CAIRO, CAIRO, 1], [RIYADH, RIYADH, 1], [KARACHI, KARACHI, 1], [TEHRAN, TEHRAN, 1]]
-Riyadh =        [BLACK,  0,0,0,0, 0, [[RIYADH, RIYADH, 0], [CAIRO, CAIRO, 1], [BAGHDAD, BAGHDAD, 1], [KARACHI, KARACHI, 1]]
-Tehran =        [BLACK,  0,0,0,0, 0, [[TEHRAN, TEHRAN, 0], [MOSCOW, MOSCOW, 1], [BAGHDAD, BAGHDAD, 1], [KARACHI, KARACHI, 1], [DELHI, DELHI, 1]]
-Karachi =       [BLACK,  0,0,0,0, 0, [[KARACHI, KARACHI, 0], [BAGHDAD, BAGHDAD, 1], [RIYADH, RIYADH, 1], [MUMBAI, MUMBAI, 1], [DELHI, DELHI, 1], [TEHRAN, TEHRAN, 1]]
-Mumbai =        [BLACK,  0,0,0,0, 0, [[MUMBAI, MUMBAI, 0], [KARACHI, KARACHI, 1], [DELHI, DELHI, 1], [CHENNAI, CHENNAI, 1]]
-Delhi =         [BLACK,  0,0,0,0, 0, [[DELHI, DELHI, 0], [TEHRAN, TEHRAN, 1], [KARACHI, KARACHI, 1], [MUMBAI, MUMBAI, 1], [CHENNAI, CHENNAI, 1], [KOLKATA, KOLKATA, 1]]
-Chennai =       [BLACK,  0,0,0,0, 0, [[CHENNAI, CHENNAI, 0], [MUMBAI, MUMBAI, 1], [DELHI, DELHI, 1], [KOLKATA, KOLKATA, 1], [BANGKOK, BANGKOK, 1], [JAKARTA, JAKARTA, 1]]
-Kolkata =       [BLACK,  0,0,0,0, 0, [[KOLKATA, KOLKATA, 0], [DELHI, DELHI, 1], [CHENNAI, CHENNAI, 1], [BANGKOK, BANGKOK, 1], [HONGKONG, HONGKONG, 1]]
-Bangkok =       [RED,    0,0,0,0, 0, [[BANGKOK, BANGKOK, 0], [KOLKATA, KOLKATA, 1], [CHENNAI, CHENNAI, 1], [JAKARTA, JAKARTA, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [HONGKONG, HONGKONG, 1]]
-Jakarta =       [RED,    0,0,0,0, 0, [[JAKARTA, JAKARTA, 0], [CHENNAI, CHENNAI, 1], [SYDNEY, SYDNEY, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [HONGKONG, HONGKONG, 1], [KOLKATA, KOLKATA, 1]]
-Sydney =        [RED,    0,0,0,0, 0, [[SYDNEY, SYDNEY, 0], [JAKARTA, JAKARTA, 1], [MANILA, MANILA, 1], [LOSANGELES, LOSANGELES, 1]]
-HoChiMinhCity = [RED,    0,0,0,0, 0, [[HOCHIMINHCITY, HOCHIMINHCITY, 0], [BANGKOK, BANGKOK, 1], [JAKARTA, JAKARTA, 1], [MANILA, MANILA, 1], [HONGKONG, HONGKONG, 1]]
-Manila =        [RED,    0,0,0,0, 0, [[MANILA, MANILA, 0], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [SYDNEY, SYDNEY, 1], [SANFRANCISCO, SANFRANCISCO, 1], [TAIPEI, TAIPEI, 1], [HONGKONG, HONGKONG, 1]]
-HongKong =      [RED,    0,0,0,0, 0, [[HONGKONG, HONGKONG, 0], [KOLKATA, KOLKATA, 1], [BANGKOK, BANGKOK, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [MANILA, MANILA, 1], [TAIPEI, TAIPEI, 1], [SHANGHAI, SHANGHAI, 1]]
-Taipei =        [RED,    0,0,0,0, 0, [[TAIPEI, TAIPEI, 0], [HONGKONG, HONGKONG, 1], [MANILA, MANILA, 1], [OSAKA, OSAKA, 1], [SHANGHAI, SHANGHAI, 1]]
-Osaka =         [RED,    0,0,0,0, 0, [[OSAKA, OSAKA, 0], [TOKYO, TOKYO, 1], [TAIPEI, TAIPEI, 1]]
-Tokyo =         [RED,    0,0,0,0, 0, [[TOKYO, TOKYO, 0], [SEOUL, SEOUL, 1], [SHANGHAI, SHANGHAI, 1], [OSAKA, OSAKA, 1], [SANFRANCISCO, SANFRANCISCO, 1]]
-Seoul =         [RED,    0,0,0,0, 0, [[SEOUL, SEOUL, 0], [BEIJING, BEIJING, 1], [SHANGHAI, SHANGHAI, 1], [TOKYO, TOKYO, 1]]
-Shanghai =      [RED,    0,0,0,0, 0, [[SHANGHAI, SHANGHAI, 0], [BEIJING, BEIJING, 1], [SEOUL, SEOUL, 1], [TOKYO, TOKYO, 1], [TAIPEI, TAIPEI, 1], [HONGKONG, HONGKONG, 1]]
-Beijing =       [RED,    0,0,0,0, 0, [[BEIJING, BEIJING, 0], [SEOUL, SEOUL, 1], [SHANGHAI, SHANGHAI, 1]]
+#City name =    [Color, Disease tokens (Blue, Yellow, Black, Red), Research Station, Connected Cities by index and steps)
+Atlanta =       [BLUE,   0,0,0,0, 1, [[ATLANTA, ATLANTA, 0], [CHICAGO, CHICAGO, 1], [WASHINGTON, WASHINGTON, 1], [MIAMI, MIAMI, 1]]]
+Washington =    [BLUE,   0,0,0,0, 0, [[WASHINGTON, WASHINGTON, 0], [ATLANTA, ATLANTA, 1], [MONTREAL, MONTREAL, 1], [NEWYORK, NEWYORK, 1]]]
+SanFransisco =  [BLUE,   0,0,0,0, 0, [[SANFRANCISCO, SANFRANCISCO, 0], [TOKYO, TOKYO, 1], [MANILA, MANILA, 1], [LOSANGELES, LOSANGELES, 1], [CHICAGO, CHICAGO, 1]]]
+Chicago =       [BLUE,   0,0,0,0, 0, [[CHICAGO, CHICAGO, 0], [SANFRANCISCO, SANFRANCISCO, 1], [LOSANGELES, LOSANGELES, 1], [MEXICOCITY, MEXICOCITY, 1], [ATLANTA, ATLANTA, 1], [MONTREAL, MONTREAL, 1]]]
+Montreal =      [BLUE,   0,0,0,0, 0, [[MONTREAL, MONTREAL, 0], [CHICAGO, CHICAGO, 1], [WASHINGTON, WASHINGTON, 1], [NEWYORK, NEWYORK, 1]]]
+NewYork =       [BLUE,   0,0,0,0, 0, [[NEWYORK, NEWYORK, 0], [MONTREAL, MONTREAL, 1], [WASHINGTON, WASHINGTON, 1], [LONDON, LONDON, 1], [MADRID, MADRID, 1]]]
+London =        [BLUE,   0,0,0,0, 0, [[LONDON, LONDON, 0], [NEWYORK, NEWYORK, 1], [MADRID, MADRID, 1], [PARIS, PARIS, 1], [ESSEN, ESSEN, 1]]]
+Madrid =        [BLUE,   0,0,0,0, 0, [[MADRID, MADRID, 0], [NEWYORK, NEWYORK, 1], [LONDON, LONDON, 1], [SAOPAULO, SAOPAULO, 1], [ALGIERS, ALGIERS, 1], [PARIS, PARIS, 1]]]
+Paris =         [BLUE,   0,0,0,0, 0, [[PARIS, PARIS, 0], [MADRID, MADRID, 1], [LONDON, LONDON, 1], [ESSEN, ESSEN, 1], [MILAN, MILAN, 1], [ALGIERS, ALGIERS, 1]]]
+Essen =         [BLUE,   0,0,0,0, 0, [[ESSEN, ESSEN, 0], [LONDON, LONDON, 1], [PARIS, PARIS, 1], [MILAN, MILAN, 1], [STPETERSBURG, STPETERSBURG, 1]]]
+Milan =         [BLUE,   0,0,0,0, 0, [[MILAN, MILAN, 0], [ESSEN, ESSEN, 1], [PARIS, PARIS, 1], [ISTANBUL, ISTANBUL, 1]]]
+StPetersburg =  [BLUE,   0,0,0,0, 0, [[STPETERSBURG, STPETERSBURG, 0], [ESSEN, ESSEN, 1], [ISTANBUL, ISTANBUL, 1], [MOSCOW, MOSCOW, 1]]]
+LosAngeles =    [YELLOW, 0,0,0,0, 0, [[LOSANGELES, LOSANGELES, 0], [SANFRANCISCO, SANFRANCISCO, 1], [CHICAGO, CHICAGO, 1], [MEXICOCITY, MEXICOCITY, 1], [SYDNEY, SYDNEY, 1]]]
+MexicoCity =    [YELLOW, 0,0,0,0, 0, [[MEXICOCITY, MEXICOCITY, 0], [LOSANGELES, LOSANGELES, 1], [CHICAGO, CHICAGO, 1], [MIAMI, MIAMI, 1], [LIMA, LIMA, 1], [BOGOTA, BOGOTA, 1]]]
+Miami =         [YELLOW, 0,0,0,0, 0, [[MIAMI, MIAMI, 0], [MEXICOCITY, MEXICOCITY, 1], [BOGOTA, BOGOTA, 1], [ATLANTA, ATLANTA, 1], [WASHINGTON, WASHINGTON, 1]]]
+Bogota =        [YELLOW, 0,0,0,0, 0, [[BOGOTA, BOGOTA, 0], [MEXICOCITY, MEXICOCITY, 1], [LIMA, LIMA, 1], [BUENOSAIRES, BUENOSAIRES, 1], [SAOPAULO, SAOPAULO, 1], [MIAMI, MIAMI, 1]]]
+Lima =          [YELLOW, 0,0,0,0, 0, [[LIMA, LIMA, 0], [MEXICOCITY, MEXICOCITY, 1], [BOGOTA, BOGOTA, 1], [SANTIAGO, SANTIAGO, 1]]]
+Santiago =      [YELLOW, 0,0,0,0, 0, [[SANTIAGO, SANTIAGO, 0], [LIMA, LIMA, 1]]]
+BuenosAires =   [YELLOW, 0,0,0,0, 0, [[BUENOSAIRES, BUENOSAIRES, 0], [BOGOTA, BOGOTA, 1], [SAOPAULO, SAOPAULO, 1]]]
+SaoPaulo =      [YELLOW, 0,0,0,0, 0, [[SAOPAULO, SAOPAULO, 0], [BOGOTA, BOGOTA, 1], [BUENOSAIRES, BUENOSAIRES, 1], [MADRID, MADRID, 1], [LAGOS, LAGOS, 1]]]
+Lagos =         [YELLOW, 0,0,0,0, 0, [[LAGOS, LAGOS, 0], [SAOPAULO, SAOPAULO, 1], [KINSASHA, KINSASHA, 1], [KHARTOUM, KHARTOUM, 1]]]
+Kinsasha =      [YELLOW, 0,0,0,0, 0, [[KINSASHA, KINSASHA, 0], [LAGOS, LAGOS, 1], [KHARTOUM, KHARTOUM, 1], [JOHANNESBURG, JOHANNESBURG, 1]]]
+Johannesburg =  [YELLOW, 0,0,0,0, 0, [[JOHANNESBURG, JOHANNESBURG, 0], [KHARTOUM, KHARTOUM, 1], [KINSASHA, KINSASHA, 1]]]
+Khartoum =      [YELLOW, 0,0,0,0, 0, [[KHARTOUM, KHARTOUM, 0], [LAGOS, LAGOS, 1], [KINSASHA, KINSASHA, 1], [JOHANNESBURG, JOHANNESBURG, 1], [CAIRO, CAIRO, 1]]]
+Algiers =       [BLACK,  0,0,0,0, 0, [[ALGIERS, ALGIERS, 0], [MADRID, MADRID, 1], [PARIS, PARIS, 1], [ISTANBUL, ISTANBUL, 1], [CAIRO, CAIRO, 1]]]
+Cairo =         [BLACK,  0,0,0,0, 0, [[CAIRO, CAIRO, 0], [ALGIERS, ALGIERS, 1], [KHARTOUM, KHARTOUM, 1], [ISTANBUL, ISTANBUL, 1], [BAGHDAD, BAGHDAD, 1], [RIYADH, RIYADH, 1]]]
+Istanbul =      [BLACK,  0,0,0,0, 0, [[ISTANBUL, ISTANBUL, 0], [MILAN, MILAN, 1], [ALGIERS, ALGIERS, 1], [CAIRO, CAIRO, 1], [BAGHDAD, BAGHDAD, 1], [MOSCOW, MOSCOW, 1], [STPETERSBURG, STPETERSBURG, 1]]]
+Moscow =        [BLACK,  0,0,0,0, 0, [[MOSCOW, MOSCOW, 0], [STPETERSBURG, STPETERSBURG, 1], [ISTANBUL, ISTANBUL, 1], [TEHRAN, TEHRAN, 1]]]
+Baghdad =       [BLACK,  0,0,0,0, 0, [[BAGHDAD, BAGHDAD, 0], [ISTANBUL, ISTANBUL, 1], [CAIRO, CAIRO, 1], [RIYADH, RIYADH, 1], [KARACHI, KARACHI, 1], [TEHRAN, TEHRAN, 1]]]
+Riyadh =        [BLACK,  0,0,0,0, 0, [[RIYADH, RIYADH, 0], [CAIRO, CAIRO, 1], [BAGHDAD, BAGHDAD, 1], [KARACHI, KARACHI, 1]]]
+Tehran =        [BLACK,  0,0,0,0, 0, [[TEHRAN, TEHRAN, 0], [MOSCOW, MOSCOW, 1], [BAGHDAD, BAGHDAD, 1], [KARACHI, KARACHI, 1], [DELHI, DELHI, 1]]]
+Karachi =       [BLACK,  0,0,0,0, 0, [[KARACHI, KARACHI, 0], [BAGHDAD, BAGHDAD, 1], [RIYADH, RIYADH, 1], [MUMBAI, MUMBAI, 1], [DELHI, DELHI, 1], [TEHRAN, TEHRAN, 1]]]
+Mumbai =        [BLACK,  0,0,0,0, 0, [[MUMBAI, MUMBAI, 0], [KARACHI, KARACHI, 1], [DELHI, DELHI, 1], [CHENNAI, CHENNAI, 1]]]
+Delhi =         [BLACK,  0,0,0,0, 0, [[DELHI, DELHI, 0], [TEHRAN, TEHRAN, 1], [KARACHI, KARACHI, 1], [MUMBAI, MUMBAI, 1], [CHENNAI, CHENNAI, 1], [KOLKATA, KOLKATA, 1]]]
+Chennai =       [BLACK,  0,0,0,0, 0, [[CHENNAI, CHENNAI, 0], [MUMBAI, MUMBAI, 1], [DELHI, DELHI, 1], [KOLKATA, KOLKATA, 1], [BANGKOK, BANGKOK, 1], [JAKARTA, JAKARTA, 1]]]
+Kolkata =       [BLACK,  0,0,0,0, 0, [[KOLKATA, KOLKATA, 0], [DELHI, DELHI, 1], [CHENNAI, CHENNAI, 1], [BANGKOK, BANGKOK, 1], [HONGKONG, HONGKONG, 1]]]
+Bangkok =       [RED,    0,0,0,0, 0, [[BANGKOK, BANGKOK, 0], [KOLKATA, KOLKATA, 1], [CHENNAI, CHENNAI, 1], [JAKARTA, JAKARTA, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [HONGKONG, HONGKONG, 1]]]
+Jakarta =       [RED,    0,0,0,0, 0, [[JAKARTA, JAKARTA, 0], [CHENNAI, CHENNAI, 1], [SYDNEY, SYDNEY, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [HONGKONG, HONGKONG, 1], [KOLKATA, KOLKATA, 1]]]
+Sydney =        [RED,    0,0,0,0, 0, [[SYDNEY, SYDNEY, 0], [JAKARTA, JAKARTA, 1], [MANILA, MANILA, 1], [LOSANGELES, LOSANGELES, 1]]]
+HoChiMinhCity = [RED,    0,0,0,0, 0, [[HOCHIMINHCITY, HOCHIMINHCITY, 0], [BANGKOK, BANGKOK, 1], [JAKARTA, JAKARTA, 1], [MANILA, MANILA, 1], [HONGKONG, HONGKONG, 1]]]
+Manila =        [RED,    0,0,0,0, 0, [[MANILA, MANILA, 0], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [SYDNEY, SYDNEY, 1], [SANFRANCISCO, SANFRANCISCO, 1], [TAIPEI, TAIPEI, 1], [HONGKONG, HONGKONG, 1]]]
+HongKong =      [RED,    0,0,0,0, 0, [[HONGKONG, HONGKONG, 0], [KOLKATA, KOLKATA, 1], [BANGKOK, BANGKOK, 1], [HOCHIMINHCITY, HOCHIMINHCITY, 1], [MANILA, MANILA, 1], [TAIPEI, TAIPEI, 1], [SHANGHAI, SHANGHAI, 1]]]
+Taipei =        [RED,    0,0,0,0, 0, [[TAIPEI, TAIPEI, 0], [HONGKONG, HONGKONG, 1], [MANILA, MANILA, 1], [OSAKA, OSAKA, 1], [SHANGHAI, SHANGHAI, 1]]]
+Osaka =         [RED,    0,0,0,0, 0, [[OSAKA, OSAKA, 0], [TOKYO, TOKYO, 1], [TAIPEI, TAIPEI, 1]]]
+Tokyo =         [RED,    0,0,0,0, 0, [[TOKYO, TOKYO, 0], [SEOUL, SEOUL, 1], [SHANGHAI, SHANGHAI, 1], [OSAKA, OSAKA, 1], [SANFRANCISCO, SANFRANCISCO, 1]]]
+Seoul =         [RED,    0,0,0,0, 0, [[SEOUL, SEOUL, 0], [BEIJING, BEIJING, 1], [SHANGHAI, SHANGHAI, 1], [TOKYO, TOKYO, 1]]]
+Shanghai =      [RED,    0,0,0,0, 0, [[SHANGHAI, SHANGHAI, 0], [BEIJING, BEIJING, 1], [SEOUL, SEOUL, 1], [TOKYO, TOKYO, 1], [TAIPEI, TAIPEI, 1], [HONGKONG, HONGKONG, 1]]]
+Beijing =       [RED,    0,0,0,0, 0, [[BEIJING, BEIJING, 0], [SEOUL, SEOUL, 1], [SHANGHAI, SHANGHAI, 1]]]
 Epidemic = EPIDEMIC
 
 roleCards = [CONTINGENCY, DISPATCHER, MEDIC, OPERATIONS, QUARANTINE, RESEARCHER, SCIENTIST]
 gameBoard = [Atlanta, Washington, SanFransisco, Chicago, Montreal, NewYork, London, Madrid, Paris, Essen, Milan, StPetersburg, LosAngeles, MexicoCity, Miami, Bogota, Lima, Santiago, BuenosAires, SaoPaulo, Lagos, Kinsasha, Johannesburg, Khartoum, Algiers, Cairo, Istanbul, Moscow, Baghdad, Riyadh, Tehran, Karachi, Mumbai, Delhi, Chennai, Kolkata, Bangkok, Jakarta, Sydney, HoChiMinhCity, Manila, HongKong, Taipei, Osaka, Tokyo, Seoul, Shanghai, Beijing]
 playerCards = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST, ONEQUIETNIGHT, RESILIENTPOP]
 infectionDeck =  [Atlanta, Washington, SanFransisco, Chicago, Montreal, NewYork, London, Madrid, Paris, Essen, Milan, StPetersburg, LosAngeles, MexicoCity, Miami, Bogota, Lima, Santiago, BuenosAires, SaoPaulo, Lagos, Kinsasha, Johannesburg, Khartoum, Algiers, Cairo, Istanbul, Moscow, Baghdad, Riyadh, Tehran, Karachi, Mumbai, Delhi, Chennai, Kolkata, Bangkok, Jakarta, Sydney, HoChiMinhCity, Manila, HongKong, Taipei, Osaka, Tokyo, Seoul, Shanghai, Beijing]
+thingy = createDistances()
+cityDistance = thingy[0]
+previousStep = thingy[1]
 
 
 
@@ -261,12 +266,12 @@ def infect(city, *args):
             location = player[i][LOCATION]                                     #find the city they are in
             if (gameBoard[location] == city):                                  #If they're in the city being infected...
                 return city                                                    #it's quarantined and cannot be infected.
-            for j in xrange(len(gameBoard[location][cOffset:])):               #Then loop through the city's neighbors
+            for j in xrange(len(gameBoard[location][cOffset])):               #Then loop through the city's neighbors
                 if (city == gameboard[player[i][LOCATION]][cOffset][j][CITYINDEX] and gameboard[player[i][LOCATION]][cOffset][j][STEPS] == NEIGHBORING): #if the city being infected is one of them...
                     return city                                                #it's quarantined and cannot be infected.
         if (player[i][ROLE] == MEDIC and cures[city[COLOR]] > 0):
             return city
-    if len(args) == 0:
+    if len(args) == 1:
         if (cures[args[0]] < ERADICATED):
             city[args[0]] = city[args[0]] + 1                                  #increment disease token of passed-on color by 1.
             if (city[args[0]] > 3):                                            #Disease tokens are capped at 3 per city
@@ -320,7 +325,7 @@ def outbreak(city):
     else:
         for i in xrange(city[cOffset:]):
             if(city[cOffset][i][STEPS] == NEIGHBORING):
-            infect(city[cOffset][i][CITYINDEX], city[COLOR])
+                infect(city[cOffset][i][CITYINDEX], city[COLOR])
 
 
 
@@ -336,40 +341,95 @@ def epidemic():
 
 
 
-def movePlayer(player, destinationIndex):
-    if player[ACTIONS] > 0:
-        location = gameBoard[player[LOCATION]]
-        for i in xrange(len(gameBoard[player[LOCATION][cOffset:]])):
-            if (gameBoard[player[LOCATION]][cOffset][i][CITYINDEX] == destinationIndex and gameBoard[player[LOCATION]][cOffset][i][STEPS] == NEIGHBORING):
-                player[LOCATION] = destinationIndex
-                player[ACTIONS] = player[ACTIONS] - 1
+def movePlayer(player, destinationIndex, *args):
+    if len(args) == 0:
+        while player[ACTIONS] > 0:
+            moveAction(player, getPath(player[LOCATION], destinationIndex))
+    if len(args) == 1:
+        steps = args[0]
+        for i in xrange(steps):
+            if player[ACTIONS] > 0:
+                moveAction(player, getPath(player[LOCATION], destinationIndex))
+    else:
+        steps = args[0]
+        dispatcher = args[1]
+        for i in xrange(steps):
+            if dispatcher[ACTIONS] > 0:
+                moveAction(player, getPath(player[LOCATION], destinationIndex), dispatcher)
 
 
 
-def directFlight(player, destinationIndex):
-    if player[ACTIONS] > 0:
-        for i in xrange(len(player[pOffset])):
-            if destinationIndex == player[pOffset][i]:
-                playerDiscard.append(player[pOffset].pop(i))
-                player[LOCATION] = destinationIndex
-                player[ACTIONS] = player[ACTIONS] - 1
+def moveAction(player, destinationIndex, *args):
+    if len(args) == 0:
+        if player[ACTIONS] > 0:
+            location = gameBoard[player[LOCATION]]
+            for i in xrange(len(location[cOffset])):
+                if (location[cOffset][i][CITYINDEX] == destinationIndex and location[cOffset][i][STEPS] == NEIGHBORING):
+                    player[LOCATION] = destinationIndex
+                    player[ACTIONS] = player[ACTIONS] - 1
+    else:            
+        dispatcher = args[0]
+        if dispatcher[ACTIONS] > 0:
+            location = gameBoard[player[LOCATION]]
+            for i in xrange(len(location[cOffset])):
+                if (location[cOffset][i][CITYINDEX] == destinationIndex and location[cOffset][i][STEPS] == NEIGHBORING):
+                    player[LOCATION] = destinationIndex
+                    dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
 
 
 
-def charterFlight(player, destinationIndex):
-    if player[ACTIONS] > 0:
-        for i in xrange(len(player[pOffset])):
-            if player[LOCATION] == player[pOffset][i]:
-                playerDiscard.append(player[pOffset].pop(i))
-                player[LOCATION] = destinationIndex
-                player[ACTIONS] = player[ACTIONS] - 1
+def directFlight(player, destinationIndex, *args):
+    if len(args) == 0:
+        if player[ACTIONS] > 0:
+            for i in xrange(len(player[pOffset])):
+                if destinationIndex == player[pOffset][i]:
+                    colorsRemaining[gameBoard[player[pOffset][i]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][i]][COLOR]] -1
+                    playerDiscard.append(player[pOffset].pop(i))
+                    player[LOCATION] = destinationIndex
+                    player[ACTIONS] = player[ACTIONS] - 1
+    else:
+        dispatcher = args[0]
+        if dispatcher[ACTIONS] > 0:
+            for i in xrange(len(player[pOffset])):
+                if destinationIndex == dispatcher[pOffset][i]:
+                    colorsRemaining[gameBoard[dispatcher[pOffset][i]][COLOR]] = colorsRemaining[gameBoard[dispatcher[pOffset][i]][COLOR]] -1
+                    playerDiscard.append(dispatcher[pOffset].pop(i))
+                    player[LOCATION] = destinationIndex
+                    dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
 
 
 
-def shuttleFlight(player, destinationIndex):
-    if gameBoard[player[LOCATION]][RESEARCH] == 1 and gameBoard[destinationIndex][RESEARCH] == 1 and player[ACTIONS] > 0:
-        player[LOCATION] = destinationIndex
-        player[ACTIONS] = player[ACTIONS] - 1
+def charterFlight(player, destinationIndex, *args):
+    if len(args) == 0:
+        if player[ACTIONS] > 0:
+            for i in xrange(len(player[pOffset])):
+                if player[LOCATION] == player[pOffset][i]:
+                    colorsRemaining[gameBoard[player[pOffset][i]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][i]][COLOR]] -1
+                    playerDiscard.append(player[pOffset].pop(i))
+                    player[LOCATION] = destinationIndex
+                    player[ACTIONS] = player[ACTIONS] - 1
+    else:
+        dispatcher = args[0]
+        if dispatcher[ACTIONS] > 0:
+            for i in xrange(len(dispatcher[pOffset])):
+                if player[LOCATION] == dispatcher[pOffset][i]:
+                    colorsRemaining[gameBoard[dispatcher[pOffset][i]][COLOR]] = colorsRemaining[gameBoard[dispatcher[pOffset][i]][COLOR]] -1
+                    playerDiscard.append(dispatcher[pOffset].pop(i))
+                    player[LOCATION] = destinationIndex
+                    dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
+
+
+
+def shuttleFlight(player, destinationIndex, *args):
+    if len(args) = 0:
+        if gameBoard[player[LOCATION]][RESEARCH] == 1 and gameBoard[destinationIndex][RESEARCH] == 1 and player[ACTIONS] > 0:
+            player[LOCATION] = destinationIndex
+            player[ACTIONS] = player[ACTIONS] - 1
+    else:
+        dispatcher = args[0]
+        if gameBoard[player[LOCATION]][RESEARCH] == 1 and gameBoard[destinationIndex][RESEARCH] == 1 and dispatcher[ACTIONS] > 0:
+            player[LOCATION] = destinationIndex
+            dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
 
 
 
@@ -382,38 +442,9 @@ def dispatchFlight(dispatcher, player, destinationIndex):
 
 
 
-def dispatchCharter(dispatcher, player, destinationIndex):
-    if dispatcher[ACTIONS] > 0:
-        for i in xrange(len(dispatcher[pOffset])):
-            if player[LOCATION] == dispatcher[pOffset][i]:
-                playerDiscard.append(dispatcher[pOffset].pop(i))
-                player[LOCATION] = destinationIndex
-                dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
-
-
-
-def dispatchDirect(dispatcher, player, destinationIndex):
-    if dispatcher[ACTIONS] > 0:
-        for i in xrange(len(player[pOffset])):
-            if destinationIndex == dispatcher[pOffset][i]:
-                playerDiscard.append(dispatcher[pOffset].pop(i))
-                player[LOCATION] = destinationIndex
-                dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
-
-
-
-def dispatchMove(dispatcher, player, destinationIndex):
-    if dispatcher[ACTIONS] > 0:
-        location = gameBoard[player[LOCATION]]
-        for i in xrange(len(gameBoard[player[LOCATION][cOffset:]])):
-            if (gameBoard[player[LOCATION]][cOffset][i][CITYINDEX] == destinationIndex and gameBoard[player[LOCATION]][cOffset][i][STEPS] == NEIGHBORING):
-                player[LOCATION] = destinationIndex
-                dispatcher[ACTIONS] = player[ACTIONS] - 1
-
-
-
 def operationsFlight(player, destinationIndex, discardIndex):
     if player[ACTIONS] > 0 and player[STORED] == 0 and player[ROLE] == OPERATIONS:
+        colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] -1
         playerDiscard.append(player[pOffset].pop(discardIndex))
         player[LOCATION] = destinationIndex
         player[ACTIONS] = player[ACTIONS] - 1
@@ -430,7 +461,7 @@ def buildResearch(player, *args):
     elif (len(args) > 0):
         gameBoard[args[0]][RESEARCH] = 0
         researchStations[researchStations.index(args[0])] = 0
-    elif (player[ROLE] == OPERATIONS and player[ACTIONS] > 0):
+    if (player[ROLE] == OPERATIONS and player[ACTIONS] > 0):
         gameBoard[player[LOCATION]][RESEARCH] = 1
         researchStations[researchStations.index(-1)] = player[LOCATION]
         player[ACTIONS] = player[ACTIONS] - 1
@@ -439,19 +470,24 @@ def buildResearch(player, *args):
         for i in xrange(len(player[pOffset])):
             if player[LOCATION] == player[pOffset][i]:
                 gameBoard[player[LOCATION]][RESEARCH] = 1
+                colorsRemaining[gameBoard[player[LOCATION]][COLOR]] = colorsRemaining[gameBoard[player[LOCATION]][COLOR]] -1
                 playerDiscard.append(player[pOffset].pop(i))
                 researchStations[researchStations.index(-1)] = player[LOCATION]
                 player[ACTIONS] = player[ACTIONS] - 1
 
 
 
+def medicMove(player):
+    for color in xrange(len(cures)):
+        if player[ROLE] == MEDIC and cures[color+1] == CURED:
+            gameBoard[player[LOCATION]][color+1] = gameBoard[player[LOCATION]][color+1] - 1
+            blocksRemaining[color+1] = blocksRemaining[color+1] + 1
+
+
+
 def treat(player, color):
-    if (player[ROLE] == MEDIC or cures[color] == CURED) and player[ACTIONS] > 0:
-        for i in xrange(gameBoard[player[LOCATION]][color]):
-            gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
-            blocksRemaining[color] = blocksRemaining[color] + 1
+    if (player[ROLE] == MEDIC or cures[color] == CURED) and (player[ROLE] != MEDIC or cures[color] != CURED) and player[ACTIONS] > 0:
         player[ACTIONS] = player[ACTIONS] - 1
-    elif player[ROLE] == MEDIC and cures[color] == CURED:
         for i in xrange(gameBoard[player[LOCATION]][color]):
             gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
             blocksRemaining[color] = blocksRemaining[color] + 1
@@ -466,14 +502,12 @@ def giveKnowledge(giver, receiver, cardIndex):
     if (giver[LOCATION] == receiver[LOCATION] and giver[ROLE] == RESEARCHER and giver[ACTIONS] > 0):
         receiver[pOffset].append(giver[pOffset].pop(cardIndex))
         giver[ACTIONS] = giver[ACTIONS] - 1
-        if len(receiver[pOffset]) > 6:
-            forceDiscard(receiver)
+        handLimit(receiver)
     elif giver[LOCATION] == receiver[LOCATION] and giver[ACTIONS] > 0:
         if giver[pOffset][cardIndex] == giver[LOCATION]:
             receiver[pOffset].append(giver[pOffset].pop(cardIndex))
             giver[ACTIONS] = giver[ACTIONS] - 1
-            if len(receiver[pOffset]) > 6:
-                forceDiscard(receiver)
+            handLimit(receiver)
 
 
 
@@ -481,19 +515,17 @@ def takeKnowledge(giver, receiver, cardIndex):
     if (giver[LOCATION] == receiver[LOCATION] and giver[ROLE] == RESEARCHER and receiver[ACTIONS] > 0):
         receiver[pOffset].append(giver[pOffset].pop(cardIndex))
         receiver[ACTIONS] = receiver[ACTIONS] - 1
-        if len(receiver[pOffset]) > 6:
-            forceDiscard(receiver)
+        handLimit(receiver)
     elif giver[LOCATION] == receiver[LOCATION] and receiver[ACTIONS] > 0:
         if giver[pOffset][cardIndex] == giver[LOCATION]:
             receiver[pOffset].append(giver[pOffset].pop(cardIndex))
             receiver[ACTIONS] = receiver[ACTIONS] - 1
-            if len(receiver[pOffset]) > 6:
-                forceDiscard(receiver)
+            handLimit(receiver)
 
 
 
 def cure(player, *args):
-    if player[ROLE] = SCIENTIST and player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
+    if player[ROLE] == SCIENTIST and player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
         cities = [gameBoard[args[1]], gameBoard[args[2]], gameBoard[args[3]], gameBoard[args[4]]]
         for i in xrange(len(cities)-2):
             if cities[i][COLOR] != cities[i+1][COLOR]:
@@ -510,9 +542,10 @@ def cure(player, *args):
 
 
 
-def eradicateCheck(color):
-    if blocksRemaining[color] == 24:
-        cures[color] = ERADICATED
+def eradicateCheck():
+    for i in xrange(len(blocksRemaining)):
+    if blocksRemaining[i] == 24:
+        cures[i] = ERADICATED
 
 
 
@@ -579,19 +612,17 @@ def playerTurn(player):
     while player[ACTIONS] > 0 and gameOver == 0:              #do 4 actions, or 5 with Generalists who aren't in this version of Pandemic.
         #insert code for choosing actions here!
         handLimit(player)                                     #check hand limit after each one
-        eradicateCheck(BLUE)
-        eradicateCheck(YELLOW)
-        eradicateCheck(BLACK)
-        eradicateCheck(RED)
+        medicMove(player)                                     #On each action, remove any cured disease cubes if the player is a medic
+        eradicateCheck()                                      #check to see if any diseases have been eradicated after each action
     if player[ROLE] == OPERATIONS:
         player[STORED] = 0
     card = playDeck.pop(0)                                    #draw a card
-    if card = EPIDEMIC:                                       #if it's an Epidemic...
+    if card == EPIDEMIC:                                      #if it's an Epidemic...
         epidemic()                                            #Epidemic time!
     else:
         player[pOffset].append(card1)                         #if not, put the card in the player's hand
     card = playDeck.pop(0)                                    #draw another card
-    if card = EPIDEMIC:                                       #if it's an Epidemic...
+    if card == EPIDEMIC:                                      #if it's an Epidemic...
         epidemic()                                            #Epidemic time!
     else:
         player[pOffset].append(card1)                         #if not, put the card in the player's hand    
@@ -611,15 +642,12 @@ def handLimit(player):
 
 
 
-def discard(player):
-    #The AI has to choose which card to discard and I have no idea how to code that yet.  Event cards, too...
-    
-    #For now... randomness.
+def discard(player):    #The AI has to choose which card to discard and I have no idea how to code that yet.  Event cards, too...  For now, randomness.
     chosenCard = np.random.random_int(0, len(player[pOffset])-1)
-    if (player[pOffset][chosenCard] == GOVGRANT or player[pOffset][chosenCard] == ONEQUIETNIGHT or player[pOffset][chosenCard] == AIRLIFT or player[pOffset][chosenCard] == FORECAST or player[pOffset][chosenCard] == RESILIENTPOP):
+    #if (player[pOffset][chosenCard] == GOVGRANT or player[pOffset][chosenCard] == ONEQUIETNIGHT or player[pOffset][chosenCard] == AIRLIFT or player[pOffset][chosenCard] == FORECAST or player[pOffset][chosenCard] == RESILIENTPOP):
         #Play the event card instead of discarding it.
-    else:
-        player[pOffset].pop(chosenCard)
+    #else:
+    playerDiscard.append(player[pOffset].pop(chosenCard))
 
 
 
@@ -633,7 +661,62 @@ def victory(cures):
         gameOver = 1
 
 
-#Notes: this project is going to require a function that puts the board together such that each city knows what neighbor to go to in order to get to any other city
-#and will require a neural network- or carefully programmed weights- for each Role's AI to learn and adapt.  This is going to be tricky.
 
-#players will need to be aware of the number of cards of each color remaining in the deck, in all players' hands, and in the discard pile, and be aware of when they've hit their limit.
+def checkNeighbors(home, destination):
+    home = gameBoard[home]
+    for i in xrange(len(home[cOffset])):
+        if destination == home[cOffset][i][0] and i != 0:
+            return 1
+    return 0
+
+
+
+def createDistances():
+    distance = np.zeros(shape = (len(gameBoard),len(gameBoard)))
+    previous = np.zeros(shape = (len(gameBoard),len(gameBoard)))
+    for home in xrange(len(gameBoard)):
+        for destination in xrange(len(gameBoard)):
+            if home == destination:
+                distance[home,destination] = 0
+                previous[home,destination] = destination
+            elif checkNeighbors(home, destination) == 1:
+                distance[home,destination] = 1
+                previous[home,destination] = home
+            else:
+                distance[home, destination] = 48
+                previous[home, destination] = -1
+    for intermediary in xrange(len(gameBoard)):
+        for home in xrange(len(gameBoard)):
+            for destination in xrange(len(gameBoard)):
+                if distance[home, intermediary] + distance[intermediary, destination] < distance[home, destination]:
+                    distance[home, destination] = distance[home, intermediary] + distance[intermediary, destination]
+                    previous[home, destination] = intermediary
+    return [distance, previous]
+
+def getPath(home, destination):
+    if home == destination or checkNeighbors(home, destination) == 1:
+        return destination
+    else:
+        getPath(home, previousStep[home, destination])
+
+#distance grid:
+#J is the source city, I is the intermediary, K is the destination.
+#i goes from 1 to 48, j goes from 1 to 48; this is x and y in a grid.
+#The i,j coordinates are the shortest known distances (currently) from i to j
+#initialize the matrix such that i to i is 0, i to a neighbor (rip these from the current city info) is 1, and i to everything else is 9 (I think that's the max pathing distance from any one node to another)
+#if the distance from i to j is less than infinity, then check to see J's path to every other city (k goes from 1 to 48), and if the distance from J to I + I to K is less than the current distance from J to k
+#set the dist of J to K to be that sum.
+#set prev(j,k)=i.
+
+#SECOND 2d array, this one storing an intermediary; initialize it such that I to I = i, i to j (if they're neighbors) = i, and everything else is undefined and will be defined later.
+
+
+#to find distance, use one 2d array; to find direction, use two 2d arrays- one to store the distance, one to store the previous location between i and k
+#prev(j,k) returns one step on the way from j to k.  if j=k, return k; if k neighbors j, then return k.  If neither, call this function on (i, prev(i,k).  Recursively call until one of the two initial conditions are met.
+
+
+
+#weights:
+#Cubes remaining can be covered by examining blocksRemaining
+colorsRemaining = [-1, 12, 12, 12]
+
