@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# <nbformat>3.0</nbformat>
-
 
 
 import numpy as np
@@ -91,7 +88,7 @@ SHANGHAI = 46
 BEIJING = 47
 GOVGRANT = 48 #finished
 AIRLIFT = 49 #finished
-FORECAST = 50 #Card removal set, but otherwise incomplete: the AI has to make decisions and I don't know how they will.
+FORECAST = 50 #Currently puts cards back such that heavily-infected cities are drawn last.
 ONEQUIETNIGHT = 51 #Finished
 RESILIENTPOP = 52 #finished
 
@@ -99,7 +96,7 @@ RESILIENTPOP = 52 #finished
 COLOR = 0
 BLOCKS = 2
 RESEARCH = 5
-cOffset = 6 #Marks the index location of the first neighboring city, ordered more-or-less counterclockwise from north.
+cOffset = 6 #Marks the index location of the first neighboring city.
 CITYINDEX = 0
 NEXTSTEP = 1
 STEPS = 2
@@ -158,11 +155,81 @@ Epidemic = EPIDEMIC
 
 roleCards = [CONTINGENCY, DISPATCHER, MEDIC, OPERATIONS, QUARANTINE, RESEARCHER, SCIENTIST]
 gameBoard = [Atlanta, Washington, SanFransisco, Chicago, Montreal, NewYork, London, Madrid, Paris, Essen, Milan, StPetersburg, LosAngeles, MexicoCity, Miami, Bogota, Lima, Santiago, BuenosAires, SaoPaulo, Lagos, Kinsasha, Johannesburg, Khartoum, Algiers, Cairo, Istanbul, Moscow, Baghdad, Riyadh, Tehran, Karachi, Mumbai, Delhi, Chennai, Kolkata, Bangkok, Jakarta, Sydney, HoChiMinhCity, Manila, HongKong, Taipei, Osaka, Tokyo, Seoul, Shanghai, Beijing]
-playerCards = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST, ONEQUIETNIGHT, RESILIENTPOP]
-infectionDeck =  [Atlanta, Washington, SanFransisco, Chicago, Montreal, NewYork, London, Madrid, Paris, Essen, Milan, StPetersburg, LosAngeles, MexicoCity, Miami, Bogota, Lima, Santiago, BuenosAires, SaoPaulo, Lagos, Kinsasha, Johannesburg, Khartoum, Algiers, Cairo, Istanbul, Moscow, Baghdad, Riyadh, Tehran, Karachi, Mumbai, Delhi, Chennai, Kolkata, Bangkok, Jakarta, Sydney, HoChiMinhCity, Manila, HongKong, Taipei, Osaka, Tokyo, Seoul, Shanghai, Beijing]
-thingy = createDistances()
+playDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST, ONEQUIETNIGHT, RESILIENTPOP]
+infectDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING]
+thingy = [0,0]
 cityDistance = thingy[0]
 previousStep = thingy[1]
+
+gameOver = 0
+
+researchStations = [ATLANTA, -1, -1, -1, -1, -1]
+outbreakMarker = 0
+infectionRateMarker = 0
+oneQuietNightMarker = 0
+cures = [-1, UNCURED, UNCURED, UNCURED, UNCURED]
+blocksRemaining = [-1, 24, 24, 24, 24]
+colorsRemaining = [-1, 12, 12, 12, 12]
+
+players = []
+infectDiscard = []
+intensify = []
+playerDiscard = []
+outbreakList = []
+
+
+
+def checkNeighbors(home, destination):
+    home = gameBoard[home]
+    for i in xrange(len(home[cOffset])):
+        if destination == home[cOffset][i][0] and i != 0:
+            return 1
+    return 0
+
+
+
+def createDistances():
+    distance = np.zeros(shape = (len(gameBoard),len(gameBoard)))
+    previous = np.zeros(shape = (len(gameBoard),len(gameBoard)))
+    for home in xrange(len(gameBoard)):
+        for destination in xrange(len(gameBoard)):
+            if home == destination:
+                distance[home,destination] = 0
+                previous[home,destination] = destination
+            elif checkNeighbors(home, destination) == 1:
+                distance[home,destination] = 1
+                previous[home,destination] = home
+            else:
+                distance[home, destination] = 48
+                previous[home, destination] = -1
+    for intermediary in xrange(len(gameBoard)):
+        for home in xrange(len(gameBoard)):
+            for destination in xrange(len(gameBoard)):
+                if distance[home, intermediary] + distance[intermediary, destination] < distance[home, destination]:
+                    distance[home, destination] = distance[home, intermediary] + distance[intermediary, destination]
+                    previous[home, destination] = intermediary
+    return [distance, previous]
+
+def getPath(home, destination):
+    if home == destination or checkNeighbors(home, destination) == 1:
+        return destination
+    else:
+        getPath(home, previousStep[home, destination])
+
+#distance grid:
+#J is the source city, I is the intermediary, K is the destination.
+#i goes from 1 to 48, j goes from 1 to 48; this is x and y in a grid.
+#The i,j coordinates are the shortest known distances (currently) from i to j
+#initialize the matrix such that i to i is 0, i to a neighbor (rip these from the current city info) is 1, and i to everything else is 9 (I think that's the max pathing distance from any one node to another)
+#if the distance from i to j is less than infinity, then check to see J's path to every other city (k goes from 1 to 48), and if the distance from J to I + I to K is less than the current distance from J to k
+#set the dist of J to K to be that sum.
+#set prev(j,k)=i.
+
+#SECOND 2d array, this one storing an intermediary; initialize it such that I to I = i, i to j (if they're neighbors) = i, and everything else is undefined and will be defined later.
+
+
+#to find distance, use one 2d array; to find direction, use two 2d arrays- one to store the distance, one to store the previous location between i and k
+#prev(j,k) returns one step on the way from j to k.  if j=k, return k; if k neighbors j, then return k.  If neither, call this function on (i, prev(i,k).  Recursively call until one of the two initial conditions are met.
 
 
 
@@ -174,38 +241,76 @@ def shuffle(givenList):
 
 
 
-def createGame(players, difficulty):
-    
+def infect(city, *args):
+    for i in xrange(len(players)): 
+        if (player[i][ROLE] == QUARANTINE):                                    #If any of the players are a Quarantine specialist
+            location = player[i][LOCATION]                                     #find the city they are in
+            if (gameBoard[location] == city):                                  #If they're in the city being infected...
+                return city                                                    #it's quarantined and cannot be infected.
+            for j in xrange(len(gameBoard[location][cOffset])):                #Then loop through the city's neighbors
+                if (city == gameboard[player[i][LOCATION]][cOffset][j][CITYINDEX] and gameboard[player[i][LOCATION]][cOffset][j][STEPS] == NEIGHBORING): #if the city being infected is one of them...
+                    return city                                                #it's quarantined and cannot be infected.
+        if (player[i][ROLE] == MEDIC and cures[city[COLOR]] > 0):
+            return city
+    if len(args) == 1:
+        if (cures[args[0]] < ERADICATED):
+            city[args[0]] = city[args[0]] + 1                                  #increment disease token of passed-on color by 1.
+            if (city[args[0]] > 3):                                            #Disease tokens are capped at 3 per city
+                city[args[0]] = 3
+                if (outbreakList.count(city) == 0):                            #If the city hasn't outbroken already from this infect card...
+                    outbreak(city)                                             #It will now!
+            else:
+                blocksRemaining[args[0]] = blocksRemaining[city[COLOR]] - 1    #Otherwise, remove one disease token from the pool
+                if (blocksRemaining[args[0]] == 0):
+                    gameOver()                                                 #if no disease tokens of that color remain, the game ends.
+        
+    else:
+        color = city[COLOR]
+        if (cures[color] < ERADICATED):
+            city[color] = city[color] + 1                                      #increment disease token of correct color by 1.
+            if (city[color] > 3):                                              #Disease tokens are capped at 3 per city
+                city[color] = 3
+                if (outbreakList.count(city) == 0):                            #If the city hasn't outbroken already from this infect card...
+                    outbreak(city)                                             #It will now!
+            else:
+                blocksRemaining[color] = blocksRemaining[color] - 1            #Otherwise, remove one disease token from the pool
+                if (blocksRemaining[color] == -1):
+                    gameOver()                                                 #if no disease tokens of that color remain, the game ends.
+    return city                                                                #Pass the city back so gameBoard can update.
+
+
+
+def createGame(players, difficulty):   
+    roleCards = shuffle([CONTINGENCY, DISPATCHER, MEDIC, OPERATIONS, QUARANTINE, RESEARCHER, SCIENTIST])
+    gameBoard = [Atlanta, Washington, SanFransisco, Chicago, Montreal, NewYork, London, Madrid, Paris, Essen, Milan, StPetersburg, LosAngeles, MexicoCity, Miami, Bogota, Lima, Santiago, BuenosAires, SaoPaulo, Lagos, Kinsasha, Johannesburg, Khartoum, Algiers, Cairo, Istanbul, Moscow, Baghdad, Riyadh, Tehran, Karachi, Mumbai, Delhi, Chennai, Kolkata, Bangkok, Jakarta, Sydney, HoChiMinhCity, Manila, HongKong, Taipei, Osaka, Tokyo, Seoul, Shanghai, Beijing]
+    playDeck = shuffle([ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST, ONEQUIETNIGHT, RESILIENTPOP])
+    infectDeck = shuffle([ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK, LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES, MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO, LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL, MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING])
+    thingy = createDistances()
+    cityDistance = thingy[0]
+    previousStep = thingy[1]
+
     gameOver = 0
-    
+
     researchStations = [ATLANTA, -1, -1, -1, -1, -1]
     outbreakMarker = 0
     infectionRateMarker = 0
     oneQuietNightMarker = 0
     cures = [-1, UNCURED, UNCURED, UNCURED, UNCURED]
     blocksRemaining = [-1, 24, 24, 24, 24]
-    
-    players = []
-    infectDeck = shuffle(infectionDeck)
-    infectDiscard = []
-    playerDiscard = []
-    outbreakList = []
-    
+    colorsRemaining = [-1, 12, 12, 12, 12]
+
     for i in xrange(9):
         card = infectDeck.pop(0)
         if i < 3:
-            infect(card)
-            infect(card)
-            infect(card)
+            gameBoard[card] = infect(gameBoard[card])
+            gameBoard[card] = infect(gameBoard[card])
+            gameBoard[card] = infect(gameBoard[card])
         elif i > 2 and i < 6:
-            infect(card)
-            infect(card)
+            gameBoard[card] = infect(gameBoard[card])
+            gameBoard[card] = infect(gameBoard[card])
         else:
-            infect(card)
+            gameBoard[card] = infect(gameBoard[card])
         infectDiscard.append(card)
-    
-    playDeck = shuffle(playerCards)
-    roleCards = shuffle(roleCards)
 
     if (players == 2):
         #player = [Role, Location, stored card, actions remaining, cards in hand]
@@ -235,109 +340,122 @@ def createGame(players, difficulty):
             player2[pOffset].append(playDeck.pop(0))
             player3[pOffset].append(playDeck.pop(0))
             player4[pOffset].append(playDeck.pop(0))
-        
+    
     if (difficulty == 4):
-        playDeckCut1 = shuffle(playDeck[:12].append[Epidemic])
-        playDeckCut2 = shuffle(playDeck[13:23].append[Epidemic])
-        playDeckCut3 = shuffle(playDeck[24:34].append[Epidemic])
-        playDeckCut4 = shuffle(playDeck[35:45].append[Epidemic])
+        playDeckCut1 = (playDeck[:12]).insert(0,Epidemic)
+        playDeckCut1 = shuffle(playDeckCut1)
+        playDeckCut2 = (playDeck[13:23]).insert(0,Epidemic)
+        playDeckCut2 = shuffle(playDeckCut2)
+        playDeckCut3 = (playDeck[24:34]).insert(0,Epidemic)
+        playDeckCut3 = shuffle(playDeckCut3)
+        playDeckCut4 = (playDeck[35:45]).insert(0,Epidemic)
+        playDeckCut4 = shuffle(playDeckCut4)
         playDeck = playDeckCut1 + playDeckCut2 + playDeckCut3 + playDeckCut4
     elif (difficulty == 5):
-        playDeckCut1 = shuffle(playDeck[:9].append[Epidemic])
-        playDeckCut2 = shuffle(playDeck[10:18].append[Epidemic])
-        playDeckCut3 = shuffle(playDeck[19:27].append[Epidemic])
-        playDeckCut4 = shuffle(playDeck[28:36].append[Epidemic])
-        playDeckCut5 = shuffle(playDeck[37:45].append[Epidemic])
+        playDeckCut1 = (playDeck[:9]).insert(0,Epidemic)
+        playDeckCut1 = shuffle(playDeckCut1)
+        playDeckCut2 = (playDeck[10:18]).insert(0,Epidemic)
+        playDeckCut2 = shuffle(playDeckCut2)
+        playDeckCut3 = (playDeck[19:27]).insert(0,Epidemic)
+        playDeckCut3 = shuffle(playDeckCut3)
+        playDeckCut4 = (playDeck[28:36]).insert(0,Epidemic)
+        playDeckCut4 = shuffle(playDeckCut4)
+        playDeckCut5 = (playDeck[37:45]).insert(0,Epidemic)
+        playDeckCut5 = shuffle(playDeckCut5)
         playDeck = playDeckCut1 + playDeckCut2 + playDeckCut3 + playDeckCut4 + playDeckCut5
     elif (difficulty == 6):
-        playDeckCut1 = shuffle(playDeck[:8].append[Epidemic])
-        playDeckCut2 = shuffle(playDeck[9:15].append[Epidemic])
-        playDeckCut3 = shuffle(playDeck[16:23].append[Epidemic])
-        playDeckCut4 = shuffle(playDeck[24:30].append[Epidemic])
-        playDeckCut5 = shuffle(playDeck[31:38].append[Epidemic])
-        playDeckCut6 = shuffle(playDeck[39:45].append[Epidemic])
+        playDeckCut1 = (playDeck[:8]).insert(0,Epidemic)
+        playDeckCut1 = shuffle(playDeckCut1)
+        playDeckCut2 = (playDeck[9:15]).insert(0,Epidemic)
+        playDeckCut2 = shuffle(playDeckCut2)
+        playDeckCut3 = (playDeck[16:23]).insert(0,Epidemic)
+        playDeckCut3 = shuffle(playDeckCut3)
+        playDeckCut4 = (playDeck[24:30]).insert(0,Epidemic)
+        playDeckCut4 = shuffle(playDeckCut4)
+        playDeckCut5 = (playDeck[31:38]).insert(0,Epidemic)
+        playDeckCut5 = shuffle(playDeckCut5)
+        playDeckCut6 = (playDeck[39:45]).insert(0,Epidemic)
+        playDeckCut6 = shuffle(playDeckCut6)
         playDeck = playDeckCut1 + playDeckCut2 + playDeckCut3 + playDeckCut4 + playDeckCut5 + playDeckCut6
-
-
-
-def infect(city, *args):
-    for i in xrange(len(players)): 
-        if (player[i][ROLE] == QUARANTINE):                                    #If any of the players are a Quarantine specialist
-            location = player[i][LOCATION]                                     #find the city they are in
-            if (gameBoard[location] == city):                                  #If they're in the city being infected...
-                return city                                                    #it's quarantined and cannot be infected.
-            for j in xrange(len(gameBoard[location][cOffset])):               #Then loop through the city's neighbors
-                if (city == gameboard[player[i][LOCATION]][cOffset][j][CITYINDEX] and gameboard[player[i][LOCATION]][cOffset][j][STEPS] == NEIGHBORING): #if the city being infected is one of them...
-                    return city                                                #it's quarantined and cannot be infected.
-        if (player[i][ROLE] == MEDIC and cures[city[COLOR]] > 0):
-            return city
-    if len(args) == 1:
-        if (cures[args[0]] < ERADICATED):
-            city[args[0]] = city[args[0]] + 1                                  #increment disease token of passed-on color by 1.
-            if (city[args[0]] > 3):                                            #Disease tokens are capped at 3 per city
-                city[args[0]] = 3
-                if (outbreakList.count(city) == 0):                            #If the city hasn't outbroken already from this infect card...
-                    outbreak(city)                                             #It will now!
-        else:
-            blocksRemaining[args[0]] = blocksRemaining[city[COLOR]] - 1        #Otherwise, remove one disease token from the pool
-            if (blocksRemaining[args[0]] < 1):
-                gameOver()                                                     #if no disease tokens of that color remain, the game ends.
         
-    else:
-        if (cures[city[COLOR]] < ERADICATED):
-            city[city[COLOR]] = city[city[COLOR]] + 1                          #increment disease token of correct color by 1.
-            if (city[city[COLOR]] > 3):                                        #Disease tokens are capped at 3 per city
-                city[city[COLOR]] = 3
-                if (outbreakList.count(city) == 0):                            #If the city hasn't outbroken already from this infect card...
-                    outbreak(city)                                             #It will now!
-            else:
-                blocksRemaining[city[COLOR]] = blocksRemaining[city[COLOR]] - 1#Otherwise, remove one disease token from the pool
-                if (blocksRemaining[city[COLOR]] < 1):
-                    gameOver()                                                 #if no disease tokens of that color remain, the game ends.
-    return city                                                                #Pass the city back.  Not always needed, but useful.
+    epidemicLikelihood = len(playDeck) / difficulty  #Odds that an epidemic will be drawn next turn; starts at full, goes down by 1 for each turn until an epidemic is drawn
+    turn = len(playDeck)/2 #There are a maximum of 22 turns in any one game of Pandemic.
+    print turn
 
 
 
 def infectionStage(infectionRate):
     outbreakList = []
-    infectDiscard.append(infect(infectDeck.pop(0)))
+    index = infectDeck.pop(0)
+    gameBoard[index] = infect(gameBoard[index])
+    infectDiscard.append(index)
     outbreakList = []
     if infectionRate < 3:
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
     elif infectionRate > 2 and infectionRate < 5:
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
         outbreakList = []
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
     else:
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
         outbreakList = []
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
         outbreakList = []
-        infectDiscard.append(infect(infectDeck.pop(0)))
+        index = infectDeck.pop(0)
+        gameBoard[index] = infect(gameBoard[index])
+        infectDiscard.append(index)
 
 
 
 def outbreak(city):
     outbreakList.append(city)
-    outbreakMarker = outbreakMarker + 1
+    outbreakMarker += 1
     if outbreakMarker == 8:
         gameOver()
     else:
         for i in xrange(city[cOffset:]):
             if(city[cOffset][i][STEPS] == NEIGHBORING):
-                infect(city[cOffset][i][CITYINDEX], city[COLOR])
+                gameBoard[city[cOffset][i][CITYINDEX]] = infect(city[cOffset][i][CITYINDEX], city[COLOR])
 
 
 
 def epidemic():
     infectionRateMarker = infectionRateMarker + 1
-    epidemicCard = infectDeck.pop()
-    infect(epidemicCard)
-    infect(epidemicCard)
-    infect(epidemicCard)
-    infectDiscard.append(epidemicCard)
-    while (len(infectDiscard)>0):                                                                #grabs a random card out of the infection discard pile and places it ontop of the infect deck,
-        infectDeck.insert(0,infectDiscard.pop(np.random.random_integers(0,len(infectDiscard)-1)))#shuffling the pile and putting it ontop of the infection deck.
+    index = infectDeck.pop()
+    epidemicCard = gameBoard[index]
+    gameBoard[index] = infect(epidemicCard)
+    gameBoard[index] = infect(epidemicCard)
+    gameBoard[index] = infect(epidemicCard)
+    infectDiscard.append(index)
+    intensify = []
+    while (len(infectDiscard)>0):                                                  
+        card = infectDiscard.pop(np.random.random_integers(0,len(infectDiscard)-1))              #grabs a random card out of the infection discard pile,
+        intensify.append(card)                                                                   #notes that it's been put back ontop so the AI players can be aware of it,
+        infectDeck.insert(0,index)                                                               #and places it ontop of the infect deck, effectively shuffling it.
+    intensify = shuffle(intensify)                                                               #Shuffle the intensify stack- otherwise the AI will know the order of the cards on the infect deck!
+
+
+
+def treat(player, color):
+    if (player[ROLE] == MEDIC or cures[color] == CURED) and (player[ROLE] != MEDIC or cures[color] != CURED) and player[ACTIONS] > 0:
+        player[ACTIONS] = player[ACTIONS] - 1
+        for i in xrange(gameBoard[player[LOCATION]][color]):
+            gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
+            blocksRemaining[color] = blocksRemaining[color] + 1
+    else:
+        gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
+        blocksRemaining[color] = blocksRemaining[color] + 1
+        player[ACTIONS] = player[ACTIONS] - 1
 
 
 
@@ -417,11 +535,12 @@ def charterFlight(player, destinationIndex, *args):
                     playerDiscard.append(dispatcher[pOffset].pop(i))
                     player[LOCATION] = destinationIndex
                     dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
+                    break;
 
 
 
 def shuttleFlight(player, destinationIndex, *args):
-    if len(args) = 0:
+    if len(args) == 0:
         if gameBoard[player[LOCATION]][RESEARCH] == 1 and gameBoard[destinationIndex][RESEARCH] == 1 and player[ACTIONS] > 0:
             player[LOCATION] = destinationIndex
             player[ACTIONS] = player[ACTIONS] - 1
@@ -442,6 +561,13 @@ def dispatchFlight(dispatcher, player, destinationIndex):
 
 
 
+def contingency(player, eventCard):
+    if player[ROLE] == CONTINGENCY and player[STORED] == 0 and playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
+        player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
+        player[ACTIONS] = player[ACTIONS] - 1
+
+
+
 def operationsFlight(player, destinationIndex, discardIndex):
     if player[ACTIONS] > 0 and player[STORED] == 0 and player[ROLE] == OPERATIONS:
         colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] -1
@@ -452,9 +578,6 @@ def operationsFlight(player, destinationIndex, discardIndex):
 
 
 
-#Normally, when a seventh research station is built, players remove an old one of their choosing.  I've never seen this happen in game,
-#so I'm not coding it in.  Thus, there can only be six research stations built.
-#Scrap all that, *args to the rescue
 def buildResearch(player, *args):
     if (gameBoard[player[LOCATION]][RESEARCH] == 1):
         return
@@ -474,27 +597,6 @@ def buildResearch(player, *args):
                 playerDiscard.append(player[pOffset].pop(i))
                 researchStations[researchStations.index(-1)] = player[LOCATION]
                 player[ACTIONS] = player[ACTIONS] - 1
-
-
-
-def medicMove(player):
-    for color in xrange(len(cures)):
-        if player[ROLE] == MEDIC and cures[color+1] == CURED:
-            gameBoard[player[LOCATION]][color+1] = gameBoard[player[LOCATION]][color+1] - 1
-            blocksRemaining[color+1] = blocksRemaining[color+1] + 1
-
-
-
-def treat(player, color):
-    if (player[ROLE] == MEDIC or cures[color] == CURED) and (player[ROLE] != MEDIC or cures[color] != CURED) and player[ACTIONS] > 0:
-        player[ACTIONS] = player[ACTIONS] - 1
-        for i in xrange(gameBoard[player[LOCATION]][color]):
-            gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
-            blocksRemaining[color] = blocksRemaining[color] + 1
-    else:
-        gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
-        blocksRemaining[color] = blocksRemaining[color] + 1
-        player[ACTIONS] = player[ACTIONS] - 1
 
 
 
@@ -531,21 +633,14 @@ def cure(player, *args):
             if cities[i][COLOR] != cities[i+1][COLOR]:
                 return
         cures[cities[0][COLOR]] = CURED
-        eradicateCheck(COLOR)
+        player[ACTIONS] = player[ACTIONS] - 1
     if player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
         cities = [gameBoard[args[1]], gameBoard[args[2]], gameBoard[args[3]], gameBoard[args[4]], gameBoard[args[5]]]
         for i in xrange(len(cities)-2):
             if cities[i][COLOR] != cities[i+1][COLOR]:
                 return
         cures[cities[0][COLOR]] = CURED
-        eradicateCheck(cities[0][COLOR])
-
-
-
-def eradicateCheck():
-    for i in xrange(len(blocksRemaining)):
-    if blocksRemaining[i] == 24:
-        cures[i] = ERADICATED
+        player[ACTIONS] = player[ACTIONS] - 1
 
 
 
@@ -591,54 +686,19 @@ def forecast(player):
     #I have no idea how to code this one... it ties into the AI and I've no idea how to do that yet, either...
     #Draw the top six cards of the Infection Deck, and put them back in any order.
     topSix = [infectDeck.pop(0), infectDeck.pop(0), infectDeck.pop(0), infectDeck.pop(0), infectDeck.pop(0), infectDeck.pop(0)]
-    for i in xrange (len(topSix)-1):
-        infectDeck.insert(0, topSix[i])
-        #so for now, they just get put back in reverse order.  I'll figure out how to sort them by which has the most of any one cube type later.
+    for i in xrange (len(topSix)):
+        if gameBoard[topSix[i]][BLUE] == 3 or gameBoard[topSix[i]][BLACK] == 3 or gameBoard[topSix[i]][RED] == 3 or gameBoard[topSix[i]][YELLOW] == 3:
+            infectDeck.insert(0, topSix.pop(i))
+    for i in xrange (len(topSix)):
+        if gameBoard[topSix[i]][BLUE] == 2 or gameBoard[topSix[i]][BLACK] == 2 or gameBoard[topSix[i]][RED] == 2 or gameBoard[topSix[i]][YELLOW] == 2:
+            infectDeck.insert(0, topSix.pop(i))
+    for i in xrange (len(topSix)):
+        infectDeck.insert(0, topSix.pop(i))
+    #This puts the cities back ontop in reverse order of the number of cubes they have: heavily-infected cities are drawn last, lightly infected ones are drawn first.
     if player[ROLE] == CONTINGENCY and player[STORED] == FORECAST:
         player[STORED] = 0
     else:
         player[pOffset].pop(player[pOffset].index(FORECAST))
-
-
-
-def contingency(player, eventCard):
-    if player[ROLE] == CONTINGENCY and player[STORED] == 0 and playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
-        player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
-        player[ACTIONS] = player[ACTIONS] - 1
-
-
-
-def playerTurn(player):
-    while player[ACTIONS] > 0 and gameOver == 0:              #do 4 actions, or 5 with Generalists who aren't in this version of Pandemic.
-        #insert code for choosing actions here!
-        handLimit(player)                                     #check hand limit after each one
-        medicMove(player)                                     #On each action, remove any cured disease cubes if the player is a medic
-        eradicateCheck()                                      #check to see if any diseases have been eradicated after each action
-    if player[ROLE] == OPERATIONS:
-        player[STORED] = 0
-    card = playDeck.pop(0)                                    #draw a card
-    if card == EPIDEMIC:                                      #if it's an Epidemic...
-        epidemic()                                            #Epidemic time!
-    else:
-        player[pOffset].append(card1)                         #if not, put the card in the player's hand
-    card = playDeck.pop(0)                                    #draw another card
-    if card == EPIDEMIC:                                      #if it's an Epidemic...
-        epidemic()                                            #Epidemic time!
-    else:
-        player[pOffset].append(card1)                         #if not, put the card in the player's hand    
-    handLimit(player)
-    #check hand limit
-    if oneQuietNightMarker == 0:
-        infectionStage(infectionRateMarker)
-    else:
-        oneQuietNightMarker = 0
-    #call the InfectionStage method, unless One Quiet Night was played; if it was, clear the event's effects.
-
-
-
-def handLimit(player):
-    while len(player[pOffset]) > 7:
-        discard(player)
 
 
 
@@ -651,72 +711,88 @@ def discard(player):    #The AI has to choose which card to discard and I have n
 
 
 
-def gameOver():
-    gameOver = 1
-
-
-
-def victory(cures):
-    if cures[BLUE] > 0 and cures[YELLOW] > 0 and cures[BLACK] > 0 and cures[RED] > 0:
+def updateGame(player):
+    if cures[BLUE] > 0 and cures[YELLOW] > 0 and cures[BLACK] > 0 and cures[RED] > 0:         #Check to see if you win!
         gameOver = 1
+    if player[ROLE] == MEDIC:                                                                 #If the player's a Medic...
+        for color in xrange(len(cures)):                                                      
+            if cures[color+1] == CURED:                                                       #And there are cured disease cubes on the city he's in, treat them for free.
+                cubes = gameBoard[player[LOCATION]][color+1]
+                gameBoard[player[LOCATION]][color+1] = 0
+                blocksRemaining[color+1] = blocksRemaining[color+1] + cubes
+    for i in xrange(len(blocksRemaining)):                                                    #Check for eradication!
+        if blocksRemaining[i] == 24 and cures[i] > 0:
+            cures[i] = ERADICATED
+    while len(player[pOffset]) > 7:                                                           #Check to see if the player needs to discard!
+        discard(player)
 
 
 
-def checkNeighbors(home, destination):
-    home = gameBoard[home]
-    for i in xrange(len(home[cOffset])):
-        if destination == home[cOffset][i][0] and i != 0:
-            return 1
-    return 0
-
-
-
-def createDistances():
-    distance = np.zeros(shape = (len(gameBoard),len(gameBoard)))
-    previous = np.zeros(shape = (len(gameBoard),len(gameBoard)))
-    for home in xrange(len(gameBoard)):
-        for destination in xrange(len(gameBoard)):
-            if home == destination:
-                distance[home,destination] = 0
-                previous[home,destination] = destination
-            elif checkNeighbors(home, destination) == 1:
-                distance[home,destination] = 1
-                previous[home,destination] = home
-            else:
-                distance[home, destination] = 48
-                previous[home, destination] = -1
-    for intermediary in xrange(len(gameBoard)):
-        for home in xrange(len(gameBoard)):
-            for destination in xrange(len(gameBoard)):
-                if distance[home, intermediary] + distance[intermediary, destination] < distance[home, destination]:
-                    distance[home, destination] = distance[home, intermediary] + distance[intermediary, destination]
-                    previous[home, destination] = intermediary
-    return [distance, previous]
-
-def getPath(home, destination):
-    if home == destination or checkNeighbors(home, destination) == 1:
-        return destination
+def playerTurn(player):
+    riskAssessment = examineBoard()
+    while player[ACTIONS] > 0 and gameOver == 0:              #do 4 actions, or 5 with Generalists who aren't in this version of Pandemic.
+        #insert code for choosing an action here!
+        updateGame(player)                                    #Refresh the board, and check victory conditions, medic's free distribution of cures, eradication, and hand limit after each action.
+    if player[ROLE] == OPERATIONS:
+        player[STORED] = 0
+    card = playDeck.pop(0)                                    #draw a card
+    if card == EPIDEMIC:                                      #if it's an Epidemic...
+        epidemic()                                            #Epidemic time!
     else:
-        getPath(home, previousStep[home, destination])
+        player[pOffset].append(card)                          #if not, put the card in the player's hand
+    card = playDeck.pop(0)                                    #draw another card
+    if card == EPIDEMIC:                                      #if it's an Epidemic...
+        epidemic()                                            #Epidemic time!
+    else:
+        player[pOffset].append(card)                          #if not, put the card in the player's hand    
+    updateGame(player)                                        #check hand limit
+    if oneQuietNightMarker == 0:
+        infectionStage(infectionRateMarker)                   #call the InfectionStage method...
+    else:                                                     #unless One Quiet Night was played
+        oneQuietNightMarker = 0                               #if it was, clear the event's effects.
+    updateGame(player)
+    epidemicLikelihood = epidemicLikelihood - 1
 
-#distance grid:
-#J is the source city, I is the intermediary, K is the destination.
-#i goes from 1 to 48, j goes from 1 to 48; this is x and y in a grid.
-#The i,j coordinates are the shortest known distances (currently) from i to j
-#initialize the matrix such that i to i is 0, i to a neighbor (rip these from the current city info) is 1, and i to everything else is 9 (I think that's the max pathing distance from any one node to another)
-#if the distance from i to j is less than infinity, then check to see J's path to every other city (k goes from 1 to 48), and if the distance from J to I + I to K is less than the current distance from J to k
-#set the dist of J to K to be that sum.
-#set prev(j,k)=i.
-
-#SECOND 2d array, this one storing an intermediary; initialize it such that I to I = i, i to j (if they're neighbors) = i, and everything else is undefined and will be defined later.
 
 
-#to find distance, use one 2d array; to find direction, use two 2d arrays- one to store the distance, one to store the previous location between i and k
-#prev(j,k) returns one step on the way from j to k.  if j=k, return k; if k neighbors j, then return k.  If neither, call this function on (i, prev(i,k).  Recursively call until one of the two initial conditions are met.
+def gameOver():
+    gameOver = 1 
 
 
 
 #weights:
-#Cubes remaining can be covered by examining blocksRemaining
-colorsRemaining = [-1, 12, 12, 12]
+#Cubes remaining can be covered by examining blocksRemaining and comparing to the initial count of 24.  AI should look at board and determine how many cubes of each color could be placed based on outbreaks and similar
+#AI needs to be aware of the cards that /were/ in the infection discard pile before an epidemic, but are now ontop of the infection deck after one.  Modifying Epidemic to include this.
+def examineBoard():
+    riskAssessment = []
+    for i in xrange(len(gameBoard)):
+        riskAssessment.append(0)
+        city = gameBoard[i]
+        for color in xrange(4):
+            if (city[color] <0):
+                riskAssessment[i] = riskAssessment[i] + city[color]
+                if city[color] == 3:
+                    city[color]
+                    riskAssessment[i] += 1
+                    for neighbors in xrange(len(city[cOffset])-1):
+                        neighbor = gameBoard[city[cOffset]][neighbors][0]
+                        if neighbors != 0:
+                            riskAssessment[i] += 1
+                            for color2 in xrange(4):
+                                if (neighbor[color2] == 3):
+                                    riskAssessment[i] += 1
+                    if intensify.count(i) == 0:
+                        riskAssessment[i] += 1
+    print riskAssessment
+    return riskAssessment
+                        
+
+
+
+createGame(2,4)
+examineBoard()
+#I do not understand these errors.
+
+
+
 
