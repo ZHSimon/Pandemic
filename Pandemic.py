@@ -94,7 +94,7 @@ GOVGRANT = 48 #finished
 AIRLIFT = 49 #finished
 FORECAST = 50 #Currently puts cards back such that heavily-infected cities are
 #drawn last.
-one_quiet_night = 51 #Finished
+ONEQUIETNIGHT = 51 #Finished
 RESILIENTPOP = 52 #finished
 
 #City terms:
@@ -410,7 +410,7 @@ playDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK,
             MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI,
             KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG,
             TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT,
-            FORECAST, one_quiet_night, RESILIENTPOP]
+            FORECAST, ONEQUIETNIGHT, RESILIENTPOP]
 infectDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK,
               LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES,
               MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO,
@@ -629,7 +629,7 @@ def create_game(players, difficulty):
                         DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY,
                         HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO,
                         SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST,
-                        one_quiet_night, RESILIENTPOP])
+                        ONEQUIETNIGHT, RESILIENTPOP])
     global infectDeck
     #This lists all of the Infect cards in the gamethey are actually Int values
     #that serve as indexes for gameBoard's cities.
@@ -1441,12 +1441,12 @@ def one_quiet_night(player):
     #Set the OneQuietNightMarker to 1, skipping the Infect stage.
     OneQuietNightMarker = 1
     #COntingency Planner card removal
-    if player[ROLE] == CONTINGENCY and player[STORED] == one_quiet_night:
+    if player[ROLE] == CONTINGENCY and player[STORED] == ONEQUIETNIGHT:
         player[STORED] = 0
     else:
         #place the card in the player discard pile
         playerDiscard.append(
-            player[pOffset].pop(player[pOffset].index(one_quiet_night)))
+            player[pOffset].pop(player[pOffset].index(ONEQUIETNIGHT)))
 
 
 #This method allows players to use the Forecast card, rearranging the top six
@@ -1498,7 +1498,7 @@ def discard(player):    #The AI has to choose which card to discard and I have
     #the below is commented out code that would check if the discarded card is
     #an Event card, and play it if it were.
     #if (player[pOffset][chosenCard] == GOVGRANT or player[pOffset][chosenCard]
-    #== one_quiet_night or player[pOffset][chosenCard] == AIRLIFT or
+    #== ONEQUIETNIGHT or player[pOffset][chosenCard] == AIRLIFT or
     #player[pOffset][chosenCard] == FORECAST or player[pOffset][chosenCard]
     #== RESILIENTPOP):
         #Play the event card instead of discarding it.
