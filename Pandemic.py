@@ -979,8 +979,9 @@ def move_player(player, destinationIndex, *args):
         dispatcher = args[1]
         #Then, for each action indicated in Steps...
         for i in xrange(steps):
-            #make sure the DIspatcher has enough actions...
-            if dispatcher[ACTIONS] > 0:
+            #make sure the Dispatcher has enough actions and the player hasn't
+            #arrived...
+            if dispatcher[ACTIONS] > 0 and player[LOCATION} != destinationIndex:
                 #and move the player if he does, adding the additional argument
                 #of the dispatcher's player list to the move_action method call.
                 move_action(player, get_path(player[LOCATION], destinationIndex)
