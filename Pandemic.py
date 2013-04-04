@@ -510,7 +510,8 @@ def get_path(home, destination):
 #to find distance, use one 2d array; to find direction, use two 2d arrays- one
 #to store the distance, one to store the previous location between i and k
 #prev(j,k) returns one step on the way from j to k.  if j=k, return k; if k
-#neighbors j, then return k.  If neither, call this function on (i, prev(i,k).  Recursively call until one of the two initial conditions are met.
+#neighbors j, then return k.  If neither, call this function on (i, prev(i,k).
+#Recursively call until one of the two initial conditions are met.
 
 
 #This simple method shuffles any list it is given and returns it.  it takes as
@@ -918,20 +919,18 @@ def epidemic():
 def treat(player, color): #Not sure how to break this If statement up...
     #Check to see if the Player has an Action remaining, and if either the
         #player is a Medic XOR the disease has been cured.
-    if (player[ROLE
-               ] == MEDIC or cures[color
-                                   ] == CURED) and (player[ROLE
-                                                           ] != MEDIC or cures[
-                                                               color] != CURED) and player[ACTIONS] > 0:
-        #If the above is true, the player must spend an action Treating.
-        player[ACTIONS] = player[ACTIONS] - 1
-        #store the number of disease cubes of that color which are at the
-        #player's location.
-        cubes = gameBoard[player[LOCATION]][color]
-        #Clear those cubes off the game board,
-        gameBoard[player[LOCATION]][color] = 0
-        #and put them back into the bin for later use.
-        blocksRemaining[color] = blocksRemaining[color] + cubes
+    if (player[ROLE] == MEDIC or cures[color] == CURED):
+        if(player[ROLE] != MEDIC or cures[color] != CURED):
+            if player[ACTIONS] > 0:
+                #If the above is true, the player must spend an action Treating.
+                player[ACTIONS] = player[ACTIONS] - 1
+                #store the number of disease cubes of that color which are at
+                #the player's location.
+                cubes = gameBoard[player[LOCATION]][color]
+                #Clear those cubes off the game board,
+                gameBoard[player[LOCATION]][color] = 0
+                #and put them back into the bin for later use.
+                blocksRemaining[color] = blocksRemaining[color] + cubes
     #Otherwise, if the player has an action left
     elif (player[ACTIONS] > 0):
         #Remove one cube of the chosen color from the player's location
@@ -1359,11 +1358,13 @@ def contingency(player, eventCard):
     #If the player's role is Contingency planner, the player has no other
     #event card stored, the event card he wants is in the discard pile, and
     #the contingency planner has enough actions...
-    if player[ROLE] == CONTINGENCY and player[STORED] == 0 and playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
-        #Draw the card out of the discard pile and attach it to the player list
-        player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
-        #and consume one action.
-        player[ACTIONS] = player[ACTIONS] - 1
+    if player[ROLE] == CONTINGENCY and player[STORED] == 0:
+        if playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
+            #Draw the card out of the discard pile and attach it to the player
+            #list
+            player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
+            #and consume one action.
+            player[ACTIONS] = player[ACTIONS] - 1
 
 
 
