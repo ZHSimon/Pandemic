@@ -90,11 +90,11 @@ TOKYO = 44
 SEOUL = 45
 SHANGHAI = 46
 BEIJING = 47
-GOVGRANT = 48 #finished
+gov_grant = 48 #finished
 AIRLIFT = 49 #finished
 FORECAST = 50 #Currently puts cards back such that heavily-infected cities are
 #drawn last.
-ONEQUIETNIGHT = 51 #Finished
+one_quiet_night = 51 #Finished
 RESILIENTPOP = 52 #finished
 
 #City terms:
@@ -409,8 +409,8 @@ playDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK,
             LAGOS, KINSASHA, JOHANNESBURG, KHARTOUM, ALGIERS, CAIRO, ISTANBUL,
             MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI, DELHI, CHENNAI,
             KOLKATA, BANGKOK, JAKARTA, SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG,
-            TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT,
-            FORECAST, ONEQUIETNIGHT, RESILIENTPOP]
+            TAIPEI, OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING, gov_grant, AIRLIFT,
+            FORECAST, one_quiet_night, RESILIENTPOP]
 infectDeck = [ATLANTA, WASHINGTON, SANFRANCISCO, CHICAGO, MONTREAL, NEWYORK,
               LONDON, MADRID, PARIS, ESSEN, MILAN, STPETERSBURG, LOSANGELES,
               MEXICOCITY, MIAMI, BOGOTA, LIMA, SANTIAGO, BUENOSAIRES, SAOPAULO,
@@ -427,10 +427,11 @@ gameOver = 0
 researchStations = [ATLANTA, -1, -1, -1, -1, -1]
 outbreakMarker = 0
 infectionRateMarker = 0
-oneQuietNightMarker = 0
+one_quiet_nightMarker = 0
 cures = [-1, UNCURED, UNCURED, UNCURED, UNCURED]
 blocksRemaining = [-1, 24, 24, 24, 24]
 colorsRemaining = [-1, 12, 12, 12, 12]
+epidemicThisTurn = 0
 
 players = []
 infectDiscard = []
@@ -442,7 +443,7 @@ outbreakList = []
 #This method examines a city to see if it neighbors another city.  it takes as
 #arguments of the home city's index, and the destination city's index.  It
 #modifies no variables.
-def checkNeighbors(home, destination):
+def check_neighbors(home, destination):
     #Save the home city's actual city info.
     home = gameBoard[home]
     #loop through the home city's neighbors
@@ -456,7 +457,7 @@ def checkNeighbors(home, destination):
 
 
 #This method creates a 2d array of distances.  It is detailed below the method.
-def createDistances():
+def create_distances():
     distance = np.zeros(shape = (len(gameBoard),len(gameBoard)))
     previous = np.zeros(shape = (len(gameBoard),len(gameBoard)))
     for home in xrange(len(gameBoard)):
@@ -464,7 +465,7 @@ def createDistances():
             if home == destination:
                 distance[home,destination] = 0
                 previous[home,destination] = destination
-            elif checkNeighbors(home, destination) == 1:
+            elif check_neighbors(home, destination) == 1:
                 distance[home,destination] = 1
                 previous[home,destination] = home
             else:
@@ -478,11 +479,11 @@ def createDistances():
                     previous[home, destination] = intermediary
     return [distance, previous]
 
-def getPath(home, destination):
-    if home == destination or checkNeighbors(home, destination) == 1:
+def get_path(home, destination):
+    if home == destination or check_neighbors(home, destination) == 1:
         return destination
     else:
-        getPath(home, previousStep[home, destination])
+        get_path(home, previousStep[home, destination])
 
 #distance grid:
 #J is the source city, I is the intermediary, K is the destination.
@@ -594,7 +595,7 @@ def infect(city, *args):
 #This method makes the game a thing!  It takes as arguments the number of
 #playes, and the number of Epidemic cards to use- the difficulty.  It modifies
 #EVERY global variable, defining many of them.
-def createGame(players, difficulty):
+def create_game(players, difficulty):
     global roleCards
     #These cards are randomly given to players, assigning them roles for the
     #game.
@@ -622,8 +623,8 @@ def createGame(players, difficulty):
                         MOSCOW, BAGHDAD, RIYADH, TEHRAN, KARACHI, MUMBAI,
                         DELHI, CHENNAI, KOLKATA, BANGKOK, JAKARTA, SYDNEY,
                         HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI, OSAKA, TOKYO,
-                        SEOUL, SHANGHAI, BEIJING, GOVGRANT, AIRLIFT, FORECAST,
-                        ONEQUIETNIGHT, RESILIENTPOP])
+                        SEOUL, SHANGHAI, BEIJING, gov_grant, AIRLIFT, FORECAST,
+                        one_quiet_night, RESILIENTPOP])
     global infectDeck
     #This lists all of the Infect cards in the gamethey are actually Int values
     #that serve as indexes for gameBoard's cities.
@@ -637,7 +638,7 @@ def createGame(players, difficulty):
                           SYDNEY, HOCHIMINHCITY, MANILA, HONGKONG, TAIPEI,
                           OSAKA, TOKYO, SEOUL, SHANGHAI, BEIJING])
     #This creates the distances and pathing between cities on the gameboard.
-    thingy = createDistances()
+    thingy = create_distances()
     cityDistance = thingy[0]
     previousStep = thingy[1]
 
@@ -651,14 +652,16 @@ def createGame(players, difficulty):
     outbreakMarker = 0
     global infectionRateMarker
     infectionRateMarker = 0
-    global oneQuietNightMarker
-    oneQuietNightMarker = 0
+    global one_quiet_nightMarker
+    one_quiet_nightMarker = 0
     global cures
     cures = [-1, UNCURED, UNCURED, UNCURED, UNCURED]
     global blocksRemaining
     blocksRemaining = [-1, 24, 24, 24, 24]
     global colorsRemaining
     colorsRemaining = [-1, 12, 12, 12, 12]
+    global epidemicThisTurn
+    epidemicThisTurn = 0
 
     #This for loop infects three cities with 3 cubes, three with 2 and 3 with 1
     #as part of the board's initial setup.  The cards are discarded to the
@@ -783,7 +786,7 @@ def createGame(players, difficulty):
 #   as an argument, draws 2, 3, or 4 cards from the Infect Deck, and infects
 #   them, potentially causing Outbreaks.  This modifies the global variables
 #   gameBoard, infectDeck, infectDiscard, and outbreakList.
-def infectionStage(infectionRate):
+def infection_stage(infectionRate):
     global outbreakList
     global infectDeck
     global infectDiscard
@@ -799,35 +802,22 @@ def infectionStage(infectionRate):
     #Clear the outbreak list again, because we aren't done yet.
     outbreakList = []
     #Rinse and repeat at least once.
-    if infectionRate < 3:
-        index = infectDeck.pop(0)
-        gameBoard[index] = infect(gameBoard[index])
-        infectDiscard.append(index)
-    #If the infection rate is 2 or more, infect three times instead of twice.
-        #this should be changed from an elif to a regular if that only runs
-        #when the InfectionRate is greater than 3.
-    elif infectionRate > 2 and infectionRate < 5:
-        index = infectDeck.pop(0)
-        gameBoard[index] = infect(gameBoard[index])
-        infectDiscard.append(index)
-        outbreakList = []
-        index = infectDeck.pop(0)
-        gameBoard[index] = infect(gameBoard[index])
-        infectDiscard.append(index)
-    #If the Infection Rate is 6 or more, infect four times.  This should also
-        #be modified to be more efficient.
-    else:
+    index = infectDeck.pop(0)
+    gameBoard[index] = infect(gameBoard[index])
+    infectDiscard.append(index)
+    outbreakList = []
+    #If the infection rate is 2 or more, infect one more city
+    if infectionRate > 2:
         index = infectDeck.pop(0)
         gameBoard[index] = infect(gameBoard[index])
         infectDiscard.append(index)
         outbreakList = []
+    #If the Infection Rate is 6 or more, infect a fourth city.
+    if infectionRate > 5:
         index = infectDeck.pop(0)
         gameBoard[index] = infect(gameBoard[index])
         infectDiscard.append(index)
         outbreakList = []
-        index = infectDeck.pop(0)
-        gameBoard[index] = infect(gameBoard[index])
-        infectDiscard.append(index)
 
 
 #This method is called when a city has more than three disease cubes of the
@@ -845,8 +835,6 @@ def outbreak(city):
     outbreakList.append(city)
     #Increment the outbreak Marker global variable
     outbreakMarker += 1
-    #Whoops, testing code I left in by mistake!
-    print "OUTBREAK!", city
     #If the outbreak marker reaches 8, the game ends.
     if outbreakMarker == 8:
         gameOver()
@@ -868,13 +856,15 @@ def outbreak(city):
 #   takes all the cards out of the Infection Discard pile, shuffles them, and
 #   puts them back ontop of the Infect Deck so they can be drawn again and
 #   really kick the player's teeth in.  This modifies the following Global
-#   Variables: gameBoard, infectionRateMarker, InfectDeck, InfectDiscard, and
-#   Intensify.
+#   Variables: gameBoard, infectionRateMarker, InfectDeck, InfectDiscard,
+#   Intensify, and EpidemicThisTurn.
 def epidemic():
     global infectionRateMarker
     global infectDeck
     global gameBoard
     global intensify
+    #Note that an epidemic happened this turn
+    epidemicThisTurn = 1
     #Increment the Infection Rate Marker.  Everything just got tougher!
     infectionRateMarker += 1
     #Draw the bottom card from the Infect Deck.
@@ -901,9 +891,13 @@ def epidemic():
         intensify.append(card)
         #and place the card ontop of the Infect Deck
         infectDeck.insert(0,index)
-    #Lastly, shuffle the Intensify list so the order the cards were placed on
-        #the Infect Deck is obscured.
+    #Shuffle the Intensify list so the order the cards were placed on the
+        #Infect Deck is obscured.
     intensify = shuffle(intensify)
+    #And finally, if One Quiet Night hasn't been played...
+    if one_quiet_nightMarker == 0:
+        #Infect.
+        infecton_stage(infectionRateMarker)
 
 
 #This method is called whenever a player uses the Treat action.  It takes as
@@ -920,21 +914,17 @@ def treat(player, color): #Not sure how to break this If statement up...
     if (player[ROLE] == MEDIC or cures[color] == CURED) and (player[ROLE] != MEDIC or cures[color] != CURED) and player[ACTIONS] > 0:
         #If the above is true, the player must spend an action Treating.
         player[ACTIONS] = player[ACTIONS] - 1
-        #Run this once per disease cube of the chosen color.  This should be
-            #replaced with a line that saves the number of cubes at the location,
-            #clears them, then adds that number of cubes back to BlocksRemaining.
-        for i in xrange(gameBoard[player[LOCATION]][color]):
-            #Remove one cube of the chosen color from the player's location
-            gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
-            #And add it back into the blocks Remaining pool, staving off defeat
-                #once again.
-            blocksRemaining[color] = blocksRemaining[color] + 1
-    #This if statement is in error: it should be an elif that checks that the
-        #player has an action left
-    else:
+        #store the number of disease cubes of that color which are at the
+        #player's location.
+        cubes = gameBoard[player[LOCATION]][color]
+        #Clear those cubes off the game board,
+        gameBoard[player[LOCATION]][color] = 0
+        #and put them back into the bin for later use.
+        blocksRemaining[color] = blocksRemaining[color] + cubes
+    #Otherwise, if the player has an action left
+    elif (player[ACTIONS] > 0:
         #Remove one cube of the chosen color from the player's location
-        gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]
-                                                       ][color] - 1
+        gameBoard[player[LOCATION]][color] = gameBoard[player[LOCATION]][color] - 1
         
         #add it back into the blocks Remaining pool
         blocksRemaining[color] = blocksRemaining[color] + 1
@@ -943,22 +933,21 @@ def treat(player, color): #Not sure how to break this If statement up...
 
 
 #This method allows a player to start to move.  It takes as arguments the
-    #player being moved, the destination the player has in mind, and a possible
-    #additional argument of the number of steps to make (if the player does not
-    #wish to move all the way to a distant destination this turn and has other
-    #actions in mind), and the Dispatcher who may be using their action to pay
-    #for the movement instead of the player being moved.  It modifies no global
-    #variables- Hooray!
-def movePlayer(player, destinationIndex, *args):
+#player being moved, the destination the player has in mind, and a possible
+#additional argument of the number of steps to make (if the player does not
+#wish to move all the way to a distant destination this turn and has other
+#actions in mind), and the Dispatcher who may be using their action to pay
+#for the movement instead of the player being moved.  It modifies no global
+#variables- Hooray!
+def move_player(player, destinationIndex, *args):
     if len(args) == 0:
         #Without arguments, the method assumes the player wishes to get to their
         #destination as quickly as possible and uses all remaining actions to do
-        #so.  This code is incorrect: if the player's destination is fewer steps
-        #away than their remaining actions, it will not react properly.
-        while player[ACTIONS] > 0:
+        #so until they get to their destination.
+        while player[ACTIONS] > 0 and player[LOCATION] != destinationIndex:
             #Move the player one step towards their destination, getting pathing
-            #info from getPath.
-            moveAction(player, getPath(player[LOCATION], destinationIndex))
+            #info from get_path.
+            move_action(player, get_path(player[LOCATION], destinationIndex))
     if len(args) == 1:
         #The first optional argument will always be the number of actions the
         #player wishes to spend on movement.
@@ -967,8 +956,8 @@ def movePlayer(player, destinationIndex, *args):
         for i in xrange(steps):
             #check to see if the player has enough remaining actions...
             if player[ACTIONS] > 0:
-                #and then move them using the info from getPath.
-                moveAction(player, getPath(player[LOCATION], destinationIndex))
+                #and then move them using the info from get_path.
+                move_action(player, get_path(player[LOCATION], destinationIndex))
     #If there's more than one argument provided (with no error proofing, of
     #course!), then we assume it's a Dispatcher using his actions to move
     #another player!
@@ -982,8 +971,8 @@ def movePlayer(player, destinationIndex, *args):
             #make sure the DIspatcher has enough actions...
             if dispatcher[ACTIONS] > 0:
                 #and move the player if he does, adding the additional argument
-                #of the dispatcher's player list to the moveAction method call.
-                moveAction(player, getPath(player[LOCATION], destinationIndex)
+                #of the dispatcher's player list to the move_action method call.
+                move_action(player, get_path(player[LOCATION], destinationIndex)
                            , dispatcher)
 
 
@@ -992,7 +981,7 @@ def movePlayer(player, destinationIndex, *args):
 #the dispatcher who will be paying for the movement with his Actions.  This
 #method modifies no global variables- hooray!  However, it does modify up to
 #two Player Lists.
-def moveAction(player, destinationIndex, *args):
+def move_action(player, destinationIndex, *args):
     #If there's no dispatcher paying for the movement...
     if len(args) == 0:
         #check (again) to see the player has the actions for this movement
@@ -1030,7 +1019,7 @@ def moveAction(player, destinationIndex, *args):
 #player wishes to fly to, and, optionally, the Dispatcher who is paying for the
 #player's movement.  It modifiesthe global variables of PlayerDiscard and
 #colorsRemaining, as a city card must be discarded for a Direct Flight.
-def directFlight(player, destinationIndex, *args):
+def direct_flight(player, destinationIndex, *args):
     #No dispatcher, so pay your own way...
     if len(args) == 0:
         #Action check!
@@ -1049,17 +1038,16 @@ def directFlight(player, destinationIndex, *args):
                     player[LOCATION] = destinationIndex
                     #And consume one of the player's actions.
                     player[ACTIONS] = player[ACTIONS] - 1
-                    #missing a Break statement.
+                    break
     #If there IS a dispatcher...
     else:
         #Grab his player list.
         dispatcher = args[0]
         #Check he has the actions...
         if dispatcher[ACTIONS] > 0:
-            #Whoops, this is wrong!  It should loop through the dispatcher's
-            #hand, not the players!
-            for i in xrange(len(player[pOffset])):
-                #Well, it kinda does do that here, but with the wrong index.
+            #Loop through the dispatcher's hand
+            for i in xrange(len(dispatcher[pOffset])):
+                #and see if he has the card matching the destination index.
                 if destinationIndex == dispatcher[pOffset][i]:
                     #These four lines are identical to the four above except that
                     #the dispatcher discards the city card and loses the action.
@@ -1067,7 +1055,7 @@ def directFlight(player, destinationIndex, *args):
                     playerDiscard.append(dispatcher[pOffset].pop(i))
                     player[LOCATION] = destinationIndex
                     dispatcher[ACTIONS] = dispatcher[ACTIONS] - 1
-                    #missing a Break statement.
+                    break
 
 
 #This method allows players to discard a city's card while in that city to fly
@@ -1075,7 +1063,7 @@ def directFlight(player, destinationIndex, *args):
 #destination city's index, and, optionally, the dispatcher who will be paying
 #for the movement.It modifies the global variables of PlayerDiscard and
 #colorsRemaining, as a city card must be discarded for a Charter Flight.
-def charterFlight(player, destinationIndex, *args):
+def charter_flight(player, destinationIndex, *args):
     #No dispatcher
     if len(args) == 0:
         #Action check
@@ -1112,7 +1100,7 @@ def charterFlight(player, destinationIndex, *args):
 #who will be moving, the destination city's index, and, optionally, the
 #dispatcher who will be paying for the movement.  It modifies no global
 #variables- hooray!
-def shuttleFlight(player, destinationIndex, *args):
+def shuttle_flight(player, destinationIndex, *args):
     #No dispatcher
     if len(args) == 0:
         #If the player's location has a research station, the destination has a
@@ -1135,7 +1123,7 @@ def shuttleFlight(player, destinationIndex, *args):
 #board.  It takes as arguments the dispatcher's player list, the moving player's
 #player list, and the destination of the flight.  It modifies no global
 #variables- hooray!
-def dispatchFlight(dispatcher, player, destinationIndex):
+def dispatch_flight(dispatcher, player, destinationIndex):
     #If the dispatcher has enough actions...
     if dispatcher[ACTIONS] > 0:
         #loop through the list of all players.
@@ -1148,31 +1136,15 @@ def dispatchFlight(dispatcher, player, destinationIndex):
                 player[LOCATION] = players[i][LOCATION]          
 
 
-#This method allows a Contingency Planner to take one Event card out of the
-#Discard pile and add it to his Player List for later use.  It takes as
-#arguments the Contingency Planner's player list, and the event card he wishes
-#to draw.  It modifies the global variables playerDiscard and ColorsRemaining.
-def contingency(player, eventCard):
-    #If the player's role is Contingency planner, the player has no other
-    #event card stored, the event card he wants is in the discard pile, and
-    #the contingency planner has enough actions...
-    if player[ROLE] == CONTINGENCY and player[STORED] == 0 and playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
-        #Draw the card out of the discard pile and attach it to the player list
-        player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
-        #and consume one action.
-        player[ACTIONS] = player[ACTIONS] - 1
-
-
 #This method allows Operations Experts to fly from any city with a Research
 #Station to any other city on the map at the price of any one card.  It takes,
 #as arguments, a player list, the index of the destination city, and the index
 #of the card being discarded for this travel.  It modifies the global variable
 #playerDiscard and ColorsRemaining.
-def operationsFlight(player, destinationIndex, discardIndex):
+def operations_flight(player, destinationIndex, discardIndex):
     #If the player has an action remaining, has not used this move this turn,
-    #and is an Opeations Expert.  This code is in error: it should also check
-    #if the Operations Expert is currently in a city with a Research Station.
-    if player[ACTIONS] > 0 and player[STORED] == 0 and player[ROLE] == OPERATIONS:
+    #and is an Opeations Expert.
+    if player[ACTIONS] > 0 and player[STORED] == 0 and player[ROLE] == OPERATIONS and gameBoard[player[LOCATION]][RESEARCH] == 1:
         #Note the color of the card being discarded in ColorsRemaining
         colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][discardIndex]][COLOR]] -1
         #Discard the card to the playerDiscard pile
@@ -1191,7 +1163,7 @@ def operationsFlight(player, destinationIndex, discardIndex):
 #pre-existing research station to remove if there are too many on the board.
 #This method modifies the global variables gameBoard, researchStations,
 #playerDiscard, and colorsRemaining.
-def buildResearch(player, *args):
+def build_research(player, *args):
     #Check that there isn't ALREADY a research station at this location...
     if (gameBoard[player[LOCATION]][RESEARCH] == 1):
         return
@@ -1213,7 +1185,7 @@ def buildResearch(player, *args):
         player[ACTIONS] = player[ACTIONS] - 1
         #And force the player to discard one card- currently, at random, though
         #it should be a card of his choosing.  Will modify to use a second arg
-        #for the index of the card to be discarded.
+        #for the index of the card to be discarded.  ERROR!
         discard(player)
     #if the player is NOT an operations expert, but has actions remaining,
     elif (player[ACTIONS] > 0):
@@ -1239,7 +1211,7 @@ def buildResearch(player, *args):
 #the player list of the giving player, the player list of the receiving player,
 #and the index number of the card being given in the giver's hand.  It modifies
 #no global variables- hooray!
-def giveKnowledge(giver, receiver, cardIndex):
+def give_knowledge(giver, receiver, cardIndex):
     #If the giver and receiver are in the same city, the giver is a Researcher,
     #and the giver has at least one action left this turn...
     if (giver[LOCATION] == receiver[LOCATION] and giver[ROLE] == RESEARCHER and giver[ACTIONS] > 0):
@@ -1265,7 +1237,7 @@ def giveKnowledge(giver, receiver, cardIndex):
 #the action instead of the giver.  This method takes arguments of the giver's
 #player list, the receiver's player list, and the index of the card being taken
 #This modifies no global variables- hooray!
-def takeKnowledge(giver, receiver, cardIndex):
+def take_knowledge(giver, receiver, cardIndex):
     #If the giver is a Researcher, is in the same city as the Receiver,
     #and the receiver can act
     if (giver[LOCATION] == receiver[LOCATION] and giver[ROLE] == RESEARCHER and receiver[ACTIONS] > 0):
@@ -1295,7 +1267,7 @@ def cure(player, *args):
     if player[ROLE] == SCIENTIST and player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
         #Create a list of the cities whose cards are being discarded...
         #these index values are each off by one.
-        cities = [gameBoard[args[1]], gameBoard[args[2]], gameBoard[args[3]], gameBoard[args[4]]]
+        cities = [gameBoard[args[0]], gameBoard[args[1]], gameBoard[args[2]], gameBoard[args[3]]]
         #loop through that list... this should probably be -1, not -2
         for i in xrange(len(cities)-2):
             #If one city's color does not match the next city's color...
@@ -1306,11 +1278,19 @@ def cure(player, *args):
         cures[cities[0][COLOR]] = CURED
         #Consume one action
         player[ACTIONS] = player[ACTIONS] - 1
-        #and... don't discard the cards?  Wow, I screwed this one up.
+        #discard each card
+        playerDiscard.append(player[pOffset][args[0]])
+        #and note that they've been discarded in ColorsRemaining
+        colorsRemaining[gameBoard[player[pOffset][args[0]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[0]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[1]])
+        colorsRemaining[gameBoard[player[pOffset][args[1]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[1]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[2]])
+        colorsRemaining[gameBoard[player[pOffset][args[2]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[2]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[3]])
+        colorsRemaining[gameBoard[player[pOffset][args[3]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[3]]][COLOR]] -1
 
     #If the player is not a scientist, but is in a research station...
-    #Error here.  Should be an elif!
-    if player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
+    elif player[ACTIONS] > 0 and gameBoard[player[LOCATION]][RESEARCH] == 1:
         #Create a list of the cities whose cards are being discarded...
         #These index values are also off by one.
         cities = [gameBoard[args[1]], gameBoard[args[2]], gameBoard[args[3]], gameBoard[args[4]], gameBoard[args[5]]]
@@ -1324,7 +1304,34 @@ def cure(player, *args):
         cures[cities[0][COLOR]] = CURED
         #Consume one action
         player[ACTIONS] = player[ACTIONS] - 1
-        #and, apparently, don't discard.  ERROR!
+        #discard each card
+        playerDiscard.append(player[pOffset][args[0]])
+        #and note that they've been discarded in ColorsRemaining
+        colorsRemaining[gameBoard[player[pOffset][args[0]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[0]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[1]])
+        colorsRemaining[gameBoard[player[pOffset][args[1]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[1]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[2]])
+        colorsRemaining[gameBoard[player[pOffset][args[2]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[2]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[3]])
+        colorsRemaining[gameBoard[player[pOffset][args[3]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[3]]][COLOR]] -1
+        playerDiscard.append(player[pOffset][args[4]])
+        colorsRemaining[gameBoard[player[pOffset][args[4]]][COLOR]] = colorsRemaining[gameBoard[player[pOffset][args[4]]][COLOR]] -1
+
+#This method allows a Contingency Planner to take one Event card out of the
+#Discard pile and add it to his Player List for later use.  It takes as
+#arguments the Contingency Planner's player list, and the event card he wishes
+#to draw.  It modifies the global variables playerDiscard and ColorsRemaining.
+def contingency(player, eventCard):
+    #If the player's role is Contingency planner, the player has no other
+    #event card stored, the event card he wants is in the discard pile, and
+    #the contingency planner has enough actions...
+    if player[ROLE] == CONTINGENCY and player[STORED] == 0 and playerDiscard.count(eventCard) > 0 and player[ACTIONS] > 0:
+        #Draw the card out of the discard pile and attach it to the player list
+        player[STORED] = playerDiscard.pop(playerDiscard.index(eventCard))
+        #and consume one action.
+        player[ACTIONS] = player[ACTIONS] - 1
+
+
 
 #Event Cards:
 
@@ -1333,7 +1340,7 @@ def cure(player, *args):
 #the game so it cannot be drawn again.  It takes as arguments the player list
 #of the player with the card, and the index of the city card to be reoved.  It
 #modifies the global variables playerDiscard, and infectDiscard.
-def resilientPopulation(player, card):
+def resilient_population(player, card):
     #Remove the infect card from the discard pile and poof it into the e-ther.
     infectDiscard.pop(card)
     #If the player is a COntingency planner with the card stored...
@@ -1342,9 +1349,9 @@ def resilientPopulation(player, card):
         player[STORED] = 0
     #Otherwise...
     else:
-        #...poof the card out of existence as well?  It should go into the
-        #player Discard pile...  ERROR!
-        player[pOffset].pop(player[pOffset].index(RESILIENTPOP))
+        #place the card in the player discard pile
+        playerDiscard.append(player[pOffset].pop(player[pOffset].index(RESILIENTPOP)))
+        
 
 
 #This method allows players to use the Airlift card to instantly fly any player
@@ -1361,46 +1368,46 @@ def airlift(player, target, destination):
         player[STORED] = 0
     #Otherwise...
     else:
-        #ERROR!  Card gets poofed into the electronic ether as well, not placed
-        #in the discard pile!
-        player[pOffset].pop(player[pOffset].index(AIRLIFT))
+        #place the card in the player discard pile
+        playerDiscard.append(player[pOffset].pop(player[pOffset].index(AIRLIFT)))
 
 
 #This event card allows a player to instantly build a research station anywhere
 #on the game map.  It takes as arguments the player list of the player with the
 #card, and the index of the city to get the shiny new research station.  It
 #modifies the global variables of gameBoard and playerDiscard.
-def govGrant(player, city):
+def gov_grant(player, city):
     #Add the research station to the destination city
     gameBoard[city][RESEARCH] = 1
     #if there's space left...
     if researchStations.count(-1) > 0:
-        #ERROR!  This should set the research station list to the city's index,
-        #not 1!
-        researchStations[researchStations.index(-1)] = 1
+        #Set the first available slot to the city's index.
+        researchStations[researchStations.index(-1)] = city
+        #ERROR!  If there are already six research stations, this should
+        #require an *args of the city index of the station that will be removed
     #If the player's a Contingency planner playing the card from storage
-    if player[ROLE] == CONTINGENCY and player[STORED] == GOVGRANT:
+    if player[ROLE] == CONTINGENCY and player[STORED] == gov_grant:
         #VANISH it.
         player[STORED] = 0
     #otherwise...
     else:
-        #ERROR!  Card vanishes into the e-ther instead of being discarded.
-        player[pOffset].pop(player[pOffset].index(GOVGRANT))
+        #place the card in the player discard pile
+        playerDiscard.append(player[pOffset].pop(player[pOffset].index(gov_grant)))
 
 
 #This method allows players to skip the Infect stage on one turn.  It can be
 #used to prevent an Epidemic from Infecting, but not from Intensifying.  It
 #takes as arguments the player list of the player with the card, and modifies
-#the global variable oneQuietNightMarker.
-def oneQuietNight(player):
-    #Set the OneQuietNightMarker to 1, skipping the Infect stage.
-    oneQuietNightMarker = 1
+#the global variable one_quiet_nightMarker.
+def one_quiet_night(player):
+    #Set the one_quiet_nightMarker to 1, skipping the Infect stage.
+    one_quiet_nightMarker = 1
     #COntingency Planner card removal
-    if player[ROLE] == CONTINGENCY and player[STORED] == ONEQUIETNIGHT:
+    if player[ROLE] == CONTINGENCY and player[STORED] == one_quiet_night:
         player[STORED] = 0
     else:
-        #ERROR!  Same as all the others.
-        player[pOffset].pop(player[pOffset].index(ONEQUIETNIGHT))
+        #place the card in the player discard pile
+        playerDiscard.append(player[pOffset].pop(player[pOffset].index(one_quiet_night)))
 
 
 #This method allows players to use the Forecast card, rearranging the top six
@@ -1431,8 +1438,8 @@ def forecast(player):
     if player[ROLE] == CONTINGENCY and player[STORED] == FORECAST:
         player[STORED] = 0
     else:
-        #Same stupid ERROR!
-        player[pOffset].pop(player[pOffset].index(FORECAST))
+        #place the card in the player discard pile
+        playerDiscard.append(player[pOffset].pop(player[pOffset].index(FORECAST)))
 
 
 #This method forces a player to discard one card from their hand.  It takes as
@@ -1443,8 +1450,8 @@ def discard(player):    #The AI has to choose which card to discard and I have
     chosenCard = np.random.random_int(0, len(player[pOffset])-1)
     #the below is commented out code that would check if the discarded card is
     #an Event card, and play it if it were.
-    #if (player[pOffset][chosenCard] == GOVGRANT or player[pOffset][chosenCard]
-    #== ONEQUIETNIGHT or player[pOffset][chosenCard] == AIRLIFT or
+    #if (player[pOffset][chosenCard] == gov_grant or player[pOffset][chosenCard]
+    #== one_quiet_night or player[pOffset][chosenCard] == AIRLIFT or
     #player[pOffset][chosenCard] == FORECAST or player[pOffset][chosenCard]
     #== RESILIENTPOP):
         #Play the event card instead of discarding it.
@@ -1459,7 +1466,7 @@ def discard(player):    #The AI has to choose which card to discard and I have
 #checks to see if the player it is passed needs to discard a card.  It takes as
 #arguments the player list of the player whose turn it is.  It modifies the
 #global variables gameOver, cures, gameBoard, and blocksRemaining.
-def updateGame(player):
+def update_game(player):
     #If all four diseases are Cured or Eradicated...  (not sure how to shorten)
     if cures[BLUE] > 0 and cures[YELLOW] > 0 and cures[BLACK] > 0 and cures[RED] > 0:
         #The players win!  A very generous estimate says 1/4th of games are won
@@ -1492,15 +1499,15 @@ def updateGame(player):
 #This method is the mechanics of a player's turn.  It will most likely become
 #a while loop or something else once the AI is finished.  It takes a player's
 #Player List as its only argument.
-def playerTurn(player):
+def player_turn(player):
     #Have the AI compile a risk assessment of the board
-    riskAssessment = examineBoard()
+    riskAssessment = examine_board()
     #While the player has actions remaining...
     while player[ACTIONS] > 0 and gameOver == 0:
         #insert code for choosing an action here!
 
         #Refresh the game board after each action
-        updateGame(player)
+        update_game(player)
     #If the player is Operations Expert
     if player[ROLE] == OPERATIONS:
         #Reset their stored value so they can take an operations flight later
@@ -1522,17 +1529,18 @@ def playerTurn(player):
     else:
         player[pOffset].append(card)
     #Update the board again- medic cures in case of Epidemics, and hand limit
-    updateGame(player)
-    #if it's not One Quiet Night
-    if oneQuietNightMarker == 0:
-        #call the InfectionStage method and infect!
-        infectionStage(infectionRateMarker)
-    #If it is...
+    update_game(player)
+    #if it's not One Quiet Night or an epidemic happened this turn
+    if one_quiet_nightMarker == 0 or epidemicThisTurn != 0:
+        #call the infection_stage method and infect!
+        infection_stage(infectionRateMarker)
+    #If it is, or there was...
     else:
-        #It isn't anymore.
-        oneQuietNightMarker = 0
+        #It isn't anymore, or the epidemic is cleared.
+        one_quiet_nightMarker = 0
+        epidemicThisTurn = 0
     #update the board one last time, for medic cures.
-    updateGame(player)
+    update_game(player)
     #Decrement the likelihood of another epidemic- information for the AI
     epidemicLikelihood = epidemicLikelihood - 1
 
@@ -1550,7 +1558,7 @@ def gameOver():
 #weights:
 #Cubes remaining can be covered by examining blocksRemaining and comparing to the initial count of 24.  AI should look at board and determine how many cubes of each color could be placed based on outbreaks and similar
 #AI needs to be aware of the cards that /were/ in the infection discard pile before an epidemic, but are now ontop of the infection deck after one.  Modifying Epidemic to include this.
-def examineBoard():
+def examine_board():
     #Create a new empty risk assessment array.
     riskAssessment = []
     global gameBoard
@@ -1568,8 +1576,6 @@ def examineBoard():
                 riskAssessment[i] = riskAssessment[i] + city[color]
                 #If the city has three cubes of one color and coulkd outbreak,
                 if city[color] == 3:
-                    #...ERROR!
-                    city[color]
                     #Increment it's risk assessment by one more.
                     riskAssessment[i] += 1
                     #And look through all of its neighbors.  No -1 needed...
@@ -1601,7 +1607,7 @@ def examineBoard():
 
 
 #Test the game mechanics by creating a game.  So far it works!
-createGame(2,4)
+create_game(2,4)
 
 
 
