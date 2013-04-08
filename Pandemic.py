@@ -981,7 +981,7 @@ def move_player(player, destinationIndex, *args):
         for i in xrange(steps):
             #make sure the Dispatcher has enough actions and the player hasn't
             #arrived...
-            if dispatcher[ACTIONS] > 0 and player[LOCATION} != destinationIndex:
+            if dispatcher[ACTIONS] > 0 and player[LOCATION] != destinationIndex:
                 #and move the player if he does, adding the additional argument
                 #of the dispatcher's player list to the move_action method call.
                 move_action(player, get_path(player[LOCATION], destinationIndex)
@@ -1660,8 +1660,5 @@ def examine_board():
 
 
 #Test the game mechanics by creating a game.  So far it works!
-create_game(2,4)
-
-
-
-
+game = create_game(2,4)
+print examine_board()
