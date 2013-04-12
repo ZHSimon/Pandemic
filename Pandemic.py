@@ -1669,7 +1669,8 @@ def examine_board(GameBoard):
     #Create a new empty risk assessment array.
     riskAssessment = []
     #Loop through the entire game board
-    for i in xrange(len(GameBoard.cities)):
+    index = 0
+    for i in GameBoard.cities.key():
         #populate the array with zeroes.
         riskAssessment.append(0)
         #Grab the city being examined by the loop
@@ -1677,32 +1678,34 @@ def examine_board(GameBoard):
         #And iterate through the colors of its diseases.
         for color in xrange(4):
             #If it has any infection cubes
-            if (city[color] <0):
+            if (city.disease_tokens[color] <0):
                 #increment it's risk assessment by one per cube.
-                riskAssessment[i] = riskAssessment[i] + city[color]
+                riskAssessment[index] += city.disease_tokens[color]
                 #If the city has three cubes of one color and coulkd outbreak,
-                if city[color] == 3:
+                if city.disease_tokens[color] == 3:
                     #Increment it's risk assessment by one more.
-                    riskAssessment[i] += 1
-                    #And look through all of its neighbors.
-                    for neighbors in xrange(len(city[NEIGHBORS])):
-                        #Grab the neighbor being looked at by the loop
-                        neighbor = gameBoard[city[NEIGHBORS]][neighbors][0]
-                        #If it's not the first 'neighbor' (the city itself)
-                        if neighbors != 0:
-                            #Increment the city's risk assessment by 1 for each
-                            #neighbor it has
-                            riskAssessment[i] += 1
-                            #Then look at each neighbor's infection cubes.
-                            for color2 in xrange(4):
-                                #If they have 3 cubes of any one color...
-                                if (neighbor[color2] == 3):
-                                    #Increment the city's risk by one more.
-                                    riskAssessment[i] += 1
-                    #If the city being examined isn't in the infectDiscard pile
-                    if infectDiscard.count(i) == 0:
-                        #Increment it's risk by one more
-                        riskAssessment[i] += 1
+                    riskAssessment[index] += 1
+        #And look through all of its neighbors.
+        for neighbors in city.city_connections.keys():
+            #Grab the neighbor being looked at by the loop
+            neighbor = GameBoard.cities[neighbors]
+            #If it's not the first 'neighbor' (the city itself)
+            if city.city_connections[neighbors] != 0:
+                #Increment the city's risk assessment by 1 for each
+                #neighbor it has
+                riskAssessment[index] += 1
+                #Then look at each neighbor's infection cubes.
+                for color2 in xrange(4):
+                    #If they have 3 cubes of any one color...
+                    if (neighbor.disease_tokens[color] == 3):
+                        #Increment the city's risk by one more.
+                        riskAssessment[index] += 1
+        #If the city being examined isn't in the infectDiscard pile
+        name = GameBoard.cities[i].name
+        if GameBoard.infect_discard.count(name) == 0:
+            #Increment it's risk by one more
+            riskAssessment[index] += 1
+        index += 1
     #Testing print statement.  Whoopsie.
     print riskAssessment
     #Return the risk assessment list after all cities have been examined.
