@@ -50,7 +50,7 @@ class GameBoard(object):
              "Tokyo": Tokyo("Tokyo"), "Seoul": Seoul("Seoul"),
              "Shanghai": Shanghai("Shanghai"), "Beijing": Beijing("Beijing")})
 
-        self.player_deck = ["Atlanta", "Washington", "San Fransisco",
+        self.player_deck = ["Atlanta", "Washington", "San Francisco",
                             "Chicago", "Montreal", "New York", "London",
                             "Madrid", "Paris", "Essen", "Milan",
                             "St. Petersburg", "Los Angeles", "Mexico City",
@@ -66,7 +66,7 @@ class GameBoard(object):
                             "Beijing", "Government Grant", "Airlift",
                             "Forecast", "One Quiet Night",
                             "Resilient Population"]
-        self.infect_deck = ["Atlanta", "Washington", "San Fransisco",
+        self.infect_deck = ["Atlanta", "Washington", "San Francisco",
                             "Chicago", "Montreal", "New York", "London",
                             "Madrid", "Paris", "Essen", "Milan",
                             "St. Petersburg", "Los Angeles", "Mexico City",
@@ -109,7 +109,7 @@ class GameBoard(object):
         elif self.outbreak_marker == 8:
             self.game_over = True
             self.reason_over = "Eight outbreaks"
-        elif self.cubes_remaining.count(0) > 0:
+        elif self.cubes_remaining.count(-24) > 0:
             self.game_over = True
             color = self.cubes_remaining.index(-1)
             self.reason_over = "Ran out of", color,"Disease Tokens"
@@ -129,6 +129,84 @@ class City(object):
         self.disease_tokens = [-1,-1,-1,-1]
         self.research_station = -1
         self.city_connections = {}
+        self.risk_assessment = 0
+
+    #This method just prints the city's information in an easy-to-read fashion.
+    def print_city(self):
+        self.numbers_to_colors = {0: "Blue", 1: "Yellow", 2: "Black", 3: "Red"}
+        print "Name:            ", self.name
+        print "Color:           ", self.numbers_to_colors[self.color]
+        print "Blue Cubes:      ", self.disease_tokens[0]
+        print "Yellow Cubes:    ", self.disease_tokens[1]
+        print "Black Cubes:     ", self.disease_tokens[2]
+        print "Red Cubes:       ", self.disease_tokens[3]
+        print "Risk Assessment: ", self.risk_assessment
+        if self.research_station == 1:
+            print "Research Station? Built"
+        else:
+            print "Research Station? Not Built"
+        print "Connected Cities:", self.city_connections
+
+    #This method determines the likelihood of an outbreak and risk factor for
+    #each individual city.  It is called, updating the city's risk_assessment,
+    #every time the city is infected. AI should look at board and determine how
+    #many cubes of each color could be placed based on outbreaks and similar
+    def assess_risk(self, GameBoard):
+        #Reset risk assessment to zero.
+        self.risk_assessment = 0
+        #Iterate through the colors of its diseases.
+        for color in xrange(4):
+            #If it has any infection cubes
+            if (self.disease_tokens[color] > 0):
+                #increment it's risk assessment by one per cube.
+                self.risk_assessment += self.disease_tokens[color]
+                #If the city has three cubes of one color and could outbreak,
+                if self.disease_tokens[color] == 3:
+                    #Increment it's risk assessment by one more.
+                    self.risk_assessment += 1
+                    #Check to see if an outbreak would end the game
+                    if GameBoard.cubes_remaining[color] + 1 - len(self.city_connections) < 0:
+                        #Panic and freak out.
+                        self.risk_assessment += 10
+                    #And look through all of its neighbors.
+                    for neighbors in self.city_connections.keys():
+                        #Grab the neighbor being looked at by the loop
+                        self.neighbor = GameBoard.cities[neighbors]
+                        #If it's a neighbor and not the city itself...
+                        if self.city_connections[neighbors] != 0:
+                            #Increment the city's risk assessment by 1 for each
+                            #neighbor it has
+                            self.risk_assessment += 1
+                            #Then look at each neighbor's infection cubes.
+                            #If they have 3 cubes of the same color...
+                            if (self.neighbor.disease_tokens[color] == 3):
+                                #Increment the city's risk by two more.
+                                self.risk_assessment += 2
+                            #If the neighbor only has two cubes...
+                            elif (self.neighbor.disease_tokens[color] == 2):
+                                #increment the city's risk by one more
+                                self.risk_assessment += 1
+        #If the city is in the infect_discard pile
+        if GameBoard.infect_discard.count(self.name) == 1:
+            #decrease its risk by one, as it can't be drawn again 'til the next
+            #epidemic.
+            self.risk_assessment += -1
+        #If it's in the intensify pile instead...
+        elif GameBoard.intensify_list.count(self.name) == 1:
+            #boost it even more as it's likely to be drawn soon.
+            self.risk_assessment += 2
+        #If it's not in either location, it's in the main deck, after all the
+        #cards in the Intensify pile.
+        else:
+            #Halve the intensify pile's size to determine how many turns until
+            #the card could be drawn...
+            self.reduction = len(GameBoard.intensify_list) / 2
+            #and reduce its risk by that amount.
+            self.risk_assessment += -self.reduction
+        #Can't have negative risk, that could be screwy.
+        if self.risk_assessment < 0:
+            self.risk_assessment = 0
+                
     #The active player builds a research station in this city.
     #Self is the city, player is the player building the research
     #station, discard_index is the index of the card being discarded in
@@ -187,6 +265,9 @@ class City(object):
             GameBoard.cubes_remaining[color] += cubes
             #and wipe them off the city
             self.disease_tokens[color] = 0
+            player.actions += -1
+            self.assess_risk(GameBoard)
+        #If the player is a medic...
         elif  player.role == "Medic":
             #Grab the number of cubes of the chosen color off the city
             cubes = self.disease_tokens[color]
@@ -194,11 +275,15 @@ class City(object):
             GameBoard.cubes_remaining[color] += cubes
             #and wipe them off the city
             self.disease_tokens[color] = 0
+            player.actions += -1
+            self.assess_risk(GameBoard)
         #If the player is not a medic and the disease isn't cured
         else:
             #remove one cube and place it back in the cubes_remaining pool
             self.disease_tokens[color] += -1
             GameBoard.cubes_remaining[color] += 1
+            player.actions += -1
+            self.assess_risk(GameBoard)
 
             
     #The game itself infects the city.  *args are, optionally, the color
@@ -229,18 +314,25 @@ class City(object):
                 if self.name in city.city_connections:
                     #and abort if it is.
                     return
-        #Check to see if an Epidemic will occur now.
+        #Check to see if an Outbreak will occur now.
         if self.disease_tokens[color] == 3:
             self.outbreak(GameBoard, Players)
+            self.assess_risk(GameBoard)
         else:
             #Otherwise, add one cube of the chosen color to the city
             self.disease_tokens[color] += 1
             #and remove it from Cubes_remaining.
             GameBoard.cubes_remaining[color] += -1
+            if GameBoard.cubes_remaining[color] <= 0:
+                GameBoard.cubes_remaining[color] = -24
+                GameBoard.check_if_game_over()
+            self.assess_risk(GameBoard)
+                
             
         
     #The game itself makes the city Outbreak.
     def outbreak(self, GameBoard, Players):
+        print "Outbreak at", self.name
         for city_name, distance in self.city_connections.iteritems():
             if distance == 1:
                 city = GameBoard.cities[city_name]
@@ -253,6 +345,7 @@ class Atlanta(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 1
         self.city_connections = {"Atlanta": 0,
                                  "Chicago": 1,
@@ -263,6 +356,7 @@ class Washington(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Washington": 0,
                                  "Atlanta": 1,
@@ -273,6 +367,7 @@ class SanFrancisco(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"San Francisco": 0,
                                  "Tokyo": 1,
@@ -284,6 +379,7 @@ class Chicago(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Chicago": 0,
                                  "San Francisco": 1,
@@ -296,6 +392,7 @@ class Montreal(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Montreal": 0,
                                  "Chicago": 1,
@@ -306,6 +403,7 @@ class NewYork(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"New York": 0,
                                  "Montreal": 1,
@@ -317,6 +415,7 @@ class London(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"London": 0,
                                  "New York": 1,
@@ -328,6 +427,7 @@ class Madrid(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Madrid": 0,
                                  "New York": 1,
@@ -340,6 +440,7 @@ class Paris(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Paris": 0,
                                  "Madrid": 1,
@@ -352,6 +453,7 @@ class Essen(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Essen": 0,
                                  "London": 1,
@@ -363,6 +465,7 @@ class Milan(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Milan": 0,
                                  "Essen": 1,
@@ -374,6 +477,7 @@ class StPetersburg(City):
         self.name = name
         self.color = GameBoard.terms["blue"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"St. Petersburg": 0,
                                  "Essen": 1,
@@ -385,6 +489,7 @@ class LosAngeles(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Los Angeles": 0,
                                  "San Francisco": 1,
@@ -397,6 +502,7 @@ class MexicoCity(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Mexico City": 0,
                                  "Los Angeles": 1,
@@ -409,6 +515,7 @@ class Miami(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Miami": 0,
                                  "Mexico City": 1,
@@ -420,6 +527,7 @@ class Bogota(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Bogota": 0,
                                  "Mexico City": 1,
@@ -432,6 +540,7 @@ class Lima(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Lima": 0,
                                  "Mexico City": 1,
@@ -442,6 +551,7 @@ class Santiago(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Santiago": 0,
                                  "Lima": 1}
@@ -450,6 +560,7 @@ class BuenosAires(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Buenos Aires": 0,
                                  "Bogota": 1,
@@ -459,6 +570,7 @@ class SaoPaulo(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Sao Paulo": 0,
                                  "Bogota": 1,
@@ -470,6 +582,7 @@ class Lagos(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Lagos": 0,
                                  "Sao Paulo": 1,
@@ -481,6 +594,7 @@ class Kinsasha(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Kinsasha": 0,
                                  "Lagos": 1,
@@ -491,6 +605,7 @@ class Johannesburg(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Johannesburg": 0,
                                  "Khartoum": 1,
@@ -500,6 +615,7 @@ class Khartoum(City):
         self.name = name
         self.color = GameBoard.terms["yellow"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Khartoum": 0,
                                  "Lagos": 1,
@@ -511,6 +627,7 @@ class Algiers(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Algiers": 0,
                                  "Madrid": 1,
@@ -522,6 +639,7 @@ class Cairo(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Cairo": 0,
                                  "Algiers": 1,
@@ -534,6 +652,7 @@ class Istanbul(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Istanbul": 0,
                                  "Milan": 1,
@@ -548,6 +667,7 @@ class Moscow(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Moscow": 0,
                                  "St. Petersburg": 1,
@@ -559,6 +679,7 @@ class Baghdad(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Baghdad": 0,
                                  "Istanbul": 1,
@@ -572,6 +693,7 @@ class Riyadh(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Riyadh": 0,
                                  "Cairo": 1,
@@ -583,6 +705,7 @@ class Tehran(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Tehran": 0,
                                  "Moscow": 1,
@@ -595,6 +718,7 @@ class Karachi(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Karachi": 0,
                                  "Baghdad": 1,
@@ -608,6 +732,7 @@ class Mumbai(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Mumbai": 0,
                                  "Karachi": 1,
@@ -619,6 +744,7 @@ class Delhi(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Delhi": 0,
                                  "Tehran": 1,
@@ -631,6 +757,7 @@ class Chennai(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Chennai": 0,
                                  "Mumbai": 1,
@@ -644,6 +771,7 @@ class Kolkata(City):
         self.name = name
         self.color = GameBoard.terms["black"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Kolkata": 0,
                                  "Delhi": 1,
@@ -655,6 +783,7 @@ class Bangkok(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Bangkok": 0,
                                  "Kolkata": 1,
@@ -667,6 +796,7 @@ class Jakarta(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Jakarta": 0,
                                  "Chennai": 1,
@@ -679,6 +809,7 @@ class Sydney(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Sydney": 0,
                                  "Jakarta": 1,
@@ -690,6 +821,7 @@ class HoChiMinhCity(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Ho Chi Minh City": 0,
                                  "Bangkok": 1,
@@ -701,6 +833,7 @@ class Manila(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Manila": 0,
                                  "Ho Chi Minh City": 1,
@@ -713,6 +846,7 @@ class HongKong(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Hong Kong": 0,
                                  "Ho Chi Minh City": 1,
@@ -726,6 +860,7 @@ class Taipei(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Taipei": 0,
                                  "Hong Kong": 1,
@@ -737,6 +872,7 @@ class Osaka(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Osaka": 0,
                                  "Tokyo": 1,
@@ -746,6 +882,7 @@ class Tokyo(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Tokyo": 0,
                                  "Seoul": 1,
@@ -757,6 +894,7 @@ class Seoul(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Seoul": 0,
                                  "Beijing": 1,
@@ -767,6 +905,7 @@ class Shanghai(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Shanghai": 0,
                                  "Beijing": 1,
@@ -779,6 +918,7 @@ class Beijing(City):
         self.name = name
         self.color = GameBoard.terms["red"]
         self.disease_tokens = [0,0,0,0]
+        self.risk_assessment = 0
         self.research_station = 0
         self.city_connections = {"Beijing": 0,
                                  "Seoul": 1,
@@ -870,38 +1010,38 @@ class Pandemic(object):
     def __init__(self, player_count, difficulty):
         self.create_game(player_count, difficulty)
     def create_game(self, player_count, difficulty):
-        self.game_board = GameBoard()
-        self.game_board.player_deck = shuffle(self.game_board.player_deck)
-        self.game_board.infect_deck = shuffle(self.game_board.infect_deck)
-        self.game_board.roles = shuffle(self.game_board.roles)
-        self.p1 = Player(self.game_board.roles.pop())
-        self.p1.hand.append(self.game_board.player_deck.pop())
-        self.p1.hand.append(self.game_board.player_deck.pop())
-        self.p2 = Player(self.game_board.roles.pop())
-        self.p2.hand.append(self.game_board.player_deck.pop())
-        self.p2.hand.append(self.game_board.player_deck.pop())
+        self.GameBoard = GameBoard()
+        self.GameBoard.player_deck = shuffle(self.GameBoard.player_deck)
+        self.GameBoard.infect_deck = shuffle(self.GameBoard.infect_deck)
+        self.GameBoard.roles = shuffle(self.GameBoard.roles)
+        self.p1 = Player(self.GameBoard.roles.pop())
+        self.p1.hand.append(self.GameBoard.player_deck.pop())
+        self.p1.hand.append(self.GameBoard.player_deck.pop())
+        self.p2 = Player(self.GameBoard.roles.pop())
+        self.p2.hand.append(self.GameBoard.player_deck.pop())
+        self.p2.hand.append(self.GameBoard.player_deck.pop())
         self.Players = [self.p1, self.p2]
         if player_count == 2:
-            self.p1.hand.append(self.game_board.player_deck.pop())
-            self.p1.hand.append(self.game_board.player_deck.pop())
-            self.p2.hand.append(self.game_board.player_deck.pop())
-            self.p2.hand.append(self.game_board.player_deck.pop())
+            self.p1.hand.append(self.GameBoard.player_deck.pop())
+            self.p1.hand.append(self.GameBoard.player_deck.pop())
+            self.p2.hand.append(self.GameBoard.player_deck.pop())
+            self.p2.hand.append(self.GameBoard.player_deck.pop())
         elif player_count == 3:
-            self.p1.hand.append(self.game_board.player_deck.pop())
-            self.p2.hand.append(self.game_board.player_deck.pop())
-            self.p3 = Player(self.game_board.roles.pop())
-            self.p3.hand.append(self.game_board.player_deck.pop())
-            self.p3.hand.append(self.game_board.player_deck.pop())
-            self.p3.hand.append(self.game_board.player_deck.pop())
+            self.p1.hand.append(self.GameBoard.player_deck.pop())
+            self.p2.hand.append(self.GameBoard.player_deck.pop())
+            self.p3 = Player(self.GameBoard.roles.pop())
+            self.p3.hand.append(self.GameBoard.player_deck.pop())
+            self.p3.hand.append(self.GameBoard.player_deck.pop())
+            self.p3.hand.append(self.GameBoard.player_deck.pop())
             self.Players.append(self.p3)
         elif player_count == 4:
-            self.p3 = Player(self.game_board.roles.pop())
-            self.p3.hand.append(self.game_board.player_deck.pop())
-            self.p3.hand.append(self.game_board.player_deck.pop())
+            self.p3 = Player(self.GameBoard.roles.pop())
+            self.p3.hand.append(self.GameBoard.player_deck.pop())
+            self.p3.hand.append(self.GameBoard.player_deck.pop())
             self.Players.append(self.p3)
-            self.p4 = Player(self.game_board.roles.pop())
-            self.p4.hand.append(self.game_board.player_deck.pop())
-            self.p4.hand.append(self.game_board.player_deck.pop())
+            self.p4 = Player(self.GameBoard.roles.pop())
+            self.p4.hand.append(self.GameBoard.player_deck.pop())
+            self.p4.hand.append(self.GameBoard.player_deck.pop())
             self.Players.append(self.p4)
 
         #Generate the game's player deck: split it into as many smaller piles
@@ -913,92 +1053,88 @@ class Pandemic(object):
         self.cut4 = []
         if (difficulty == 4):
             for i in xrange(11):
-                self.cut1.append(self.game_board.player_deck.pop(0))
-                self.cut2.append(self.game_board.player_deck.pop(0))
-                self.cut3.append(self.game_board.player_deck.pop(0))
-                self.cut4.append(self.game_board.player_deck.pop(0))
+                self.cut1.append(self.GameBoard.player_deck.pop(0))
+                self.cut2.append(self.GameBoard.player_deck.pop(0))
+                self.cut3.append(self.GameBoard.player_deck.pop(0))
+                self.cut4.append(self.GameBoard.player_deck.pop(0))
             if player_count != 3:
-                self.cut1.append(self.game_board.player_deck.pop(0))
-            self.cut1.append(self.game_board.events["Epidemic"])
-            self.cut2.append(self.game_board.events["Epidemic"])
-            self.cut3.append(self.game_board.events["Epidemic"])
-            self.cut4.append(self.game_board.events["Epidemic"])
-            self.game_board.player_deck = shuffle(self.cut1)
-            self.game_board.player_deck.append(shuffle(self.cut2))
-            self.game_board.player_deck.append(shuffle(self.cut3))
-            self.game_board.player_deck.append(shuffle(self.cut4))
+                self.cut1.append(self.GameBoard.player_deck.pop(0))
+            self.cut1.append(self.GameBoard.events["Epidemic"])
+            self.cut2.append(self.GameBoard.events["Epidemic"])
+            self.cut3.append(self.GameBoard.events["Epidemic"])
+            self.cut4.append(self.GameBoard.events["Epidemic"])
+            self.GameBoard.player_deck = shuffle(self.cut1)
+            self.GameBoard.player_deck.append(shuffle(self.cut2))
+            self.GameBoard.player_deck.append(shuffle(self.cut3))
+            self.GameBoard.player_deck.append(shuffle(self.cut4))
         elif (difficulty == 5):
             self.cut5 = []
             for i in xrange(8):
-                self.cut1.append(self.game_board.player_deck.pop(0))
-                self.cut2.append(self.game_board.player_deck.pop(0))
-                self.cut3.append(self.game_board.player_deck.pop(0))
-                self.cut4.append(self.game_board.player_deck.pop(0))
-                self.cut5.append(self.game_board.player_deck.pop(0))
-            self.cut1.append(self.game_board.player_deck.pop(0))
-            self.cut2.append(self.game_board.player_deck.pop(0))
-            self.cut3.append(self.game_board.player_deck.pop(0))
-            self.cut4.append(self.game_board.player_deck.pop(0))
+                self.cut1.append(self.GameBoard.player_deck.pop(0))
+                self.cut2.append(self.GameBoard.player_deck.pop(0))
+                self.cut3.append(self.GameBoard.player_deck.pop(0))
+                self.cut4.append(self.GameBoard.player_deck.pop(0))
+                self.cut5.append(self.GameBoard.player_deck.pop(0))
+            self.cut1.append(self.GameBoard.player_deck.pop(0))
+            self.cut2.append(self.GameBoard.player_deck.pop(0))
+            self.cut3.append(self.GameBoard.player_deck.pop(0))
+            self.cut4.append(self.GameBoard.player_deck.pop(0))
             if player_count == 3:
-                self.cut5.append(self.game_board.player_deck.pop(0))
-            self.cut1.append(self.game_board.events["Epidemic"])
-            self.cut2.append(self.game_board.events["Epidemic"])
-            self.cut3.append(self.game_board.events["Epidemic"])
-            self.cut4.append(self.game_board.events["Epidemic"])
-            self.cut5.append(self.game_board.events["Epidemic"])
-            self.game_board.player_deck = shuffle(self.cut1)
-            self.game_board.player_deck.append(shuffle(self.cut2))
-            self.game_board.player_deck.append(shuffle(self.cut3))
-            self.game_board.player_deck.append(shuffle(self.cut4))
-            self.game_board.player_deck.append(shuffle(self.cut5))
+                self.cut5.append(self.GameBoard.player_deck.pop(0))
+            self.cut1.append(self.GameBoard.events["Epidemic"])
+            self.cut2.append(self.GameBoard.events["Epidemic"])
+            self.cut3.append(self.GameBoard.events["Epidemic"])
+            self.cut4.append(self.GameBoard.events["Epidemic"])
+            self.cut5.append(self.GameBoard.events["Epidemic"])
+            self.GameBoard.player_deck = shuffle(self.cut1)
+            self.GameBoard.player_deck.append(shuffle(self.cut2))
+            self.GameBoard.player_deck.append(shuffle(self.cut3))
+            self.GameBoard.player_deck.append(shuffle(self.cut4))
+            self.GameBoard.player_deck.append(shuffle(self.cut5))
         elif (difficulty == 6):
             self.cut5 = []
             self.cut6 = []
             for i in xrange(7):
-                self.cut1.append(self.game_board.player_deck.pop(0))
-                self.cut2.append(self.game_board.player_deck.pop(0))
-                self.cut3.append(self.game_board.player_deck.pop(0))
-                self.cut4.append(self.game_board.player_deck.pop(0))
-                self.cut5.append(self.game_board.player_deck.pop(0))
-                self.cut6.append(self.game_board.player_deck.pop(0))
-            self.cut1.append(self.game_board.player_deck.pop(0))
-            self.cut2.append(self.game_board.player_deck.pop(0))
+                self.cut1.append(self.GameBoard.player_deck.pop(0))
+                self.cut2.append(self.GameBoard.player_deck.pop(0))
+                self.cut3.append(self.GameBoard.player_deck.pop(0))
+                self.cut4.append(self.GameBoard.player_deck.pop(0))
+                self.cut5.append(self.GameBoard.player_deck.pop(0))
+                self.cut6.append(self.GameBoard.player_deck.pop(0))
+            self.cut1.append(self.GameBoard.player_deck.pop(0))
+            self.cut2.append(self.GameBoard.player_deck.pop(0))
             if player_count == 3:
-                self.cut3.append(self.game_board.player_deck.pop(0))
-            self.cut1.append(self.game_board.events["Epidemic"])
-            self.cut2.append(self.game_board.events["Epidemic"])
-            self.cut3.append(self.game_board.events["Epidemic"])
-            self.cut4.append(self.game_board.events["Epidemic"])
-            self.cut5.append(self.game_board.events["Epidemic"])
-            self.cut6.append(self.game_board.events["Epidemic"])
-            self.game_board.player_deck = shuffle(self.cut1)
-            self.game_board.player_deck.append(shuffle(self.cut2))
-            self.game_board.player_deck.append(shuffle(self.cut3))
-            self.game_board.player_deck.append(shuffle(self.cut4))
-            self.game_board.player_deck.append(shuffle(self.cut5))
-            self.game_board.player_deck.append(shuffle(self.cut6))
+                self.cut3.append(self.GameBoard.player_deck.pop(0))
+            self.cut1.append(self.GameBoard.events["Epidemic"])
+            self.cut2.append(self.GameBoard.events["Epidemic"])
+            self.cut3.append(self.GameBoard.events["Epidemic"])
+            self.cut4.append(self.GameBoard.events["Epidemic"])
+            self.cut5.append(self.GameBoard.events["Epidemic"])
+            self.cut6.append(self.GameBoard.events["Epidemic"])
+            self.GameBoard.player_deck = shuffle(self.cut1)
+            self.GameBoard.player_deck.append(shuffle(self.cut2))
+            self.GameBoard.player_deck.append(shuffle(self.cut3))
+            self.GameBoard.player_deck.append(shuffle(self.cut4))
+            self.GameBoard.player_deck.append(shuffle(self.cut5))
+            self.GameBoard.player_deck.append(shuffle(self.cut6))
 
             
         #This for loop infects three cities with 3 cubes, three with 2 and 3
         #with 1 as part of the board's initial setup.  The cards are discarded
         #to the infect_discard pile.
         for i in xrange(9):
-            self.card = self.game_board.infect_deck.pop(0)
+            self.card = self.GameBoard.infect_deck.pop(0)
+            self.city = self.GameBoard.cities[self.card]
+            self.GameBoard.infect_discard.append(self.card)
             if i < 3:
-                self.game_board.cities[self.card
-                                       ].infect(self.game_board, self.Players)
-                self.game_board.cities[self.card
-                                       ].infect(self.game_board, self.Players)
-                self.game_board.cities[self.card
-                                       ].infect(self.game_board, self.Players)
+                self.city.infect(self.GameBoard, self.Players)
+                self.city.infect(self.GameBoard, self.Players)
+                self.city.infect(self.GameBoard, self.Players)
             elif i > 2 and i < 6:
-                self.game_board.cities[self.card
-                                       ].infect(self.game_board, self.Players)
-                self.game_board.cities[self.card
-                                       ].infect(self.game_board, self.Players)
+                self.city.infect(self.GameBoard, self.Players)
+                self.city.infect(self.GameBoard, self.Players)
             else:
-                self.game_board.cities[self.card].infect(self.game_board, self.Players)
-            self.game_board.infect_discard.append(self.card)
+                self.city.infect(self.GameBoard, self.Players)
            
 
 
@@ -1655,60 +1791,12 @@ def update_game(GameBoard, player):
         #And discard until it doesn't.
         discard(player)
 
-
-
-#this method is the beginnings of the AI for this game.  It creates a risk
-#assessment of the board, examining each city and calculating how bad it could
-#get should that city get infected.  It modifies no global variables- hooray!
-
-#weights:
-#Cubes remaining can be covered by examining blocksRemaining and comparing to
-#the initial count of 24.  AI should look at board and determine how many cubes
-#of each color could be placed based on outbreaks and similar
-def examine_board(GameBoard):
-    #Create a new empty risk assessment array.
-    riskAssessment = []
-    #Loop through the entire game board
-    index = 0
-    for i in GameBoard.cities.key():
-        #populate the array with zeroes.
-        riskAssessment.append(0)
-        #Grab the city being examined by the loop
-        city = GameBoard.cities[i]
-        #And iterate through the colors of its diseases.
-        for color in xrange(4):
-            #If it has any infection cubes
-            if (city.disease_tokens[color] <0):
-                #increment it's risk assessment by one per cube.
-                riskAssessment[index] += city.disease_tokens[color]
-                #If the city has three cubes of one color and coulkd outbreak,
-                if city.disease_tokens[color] == 3:
-                    #Increment it's risk assessment by one more.
-                    riskAssessment[index] += 1
-        #And look through all of its neighbors.
-        for neighbors in city.city_connections.keys():
-            #Grab the neighbor being looked at by the loop
-            neighbor = GameBoard.cities[neighbors]
-            #If it's not the first 'neighbor' (the city itself)
-            if city.city_connections[neighbors] != 0:
-                #Increment the city's risk assessment by 1 for each
-                #neighbor it has
-                riskAssessment[index] += 1
-                #Then look at each neighbor's infection cubes.
-                for color2 in xrange(4):
-                    #If they have 3 cubes of any one color...
-                    if (neighbor.disease_tokens[color] == 3):
-                        #Increment the city's risk by one more.
-                        riskAssessment[index] += 1
-        #If the city being examined isn't in the infectDiscard pile
-        name = GameBoard.cities[i].name
-        if GameBoard.infect_discard.count(name) == 0:
-            #Increment it's risk by one more
-            riskAssessment[index] += 1
-        index += 1
-    #Testing print statement.  Whoopsie.
-    print riskAssessment
-    #Return the risk assessment list after all cities have been examined.
-    return riskAssessment
+    
 
 Game = Pandemic(3, 4)
+index = 0
+for city_tuple in Game.GameBoard.cities.iteritems():
+    city = Game.GameBoard.cities[city_tuple[0]]
+    city.print_city()
+    print
+        
