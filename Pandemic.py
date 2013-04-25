@@ -1,6 +1,68 @@
 import numpy as np
 import operator
 import collections
+import random
+
+
+def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
+    if depth == 0:
+        #Board value starts at 96- the total number of cubes
+        board_value = 96
+        #Reduce it by 1 for each cube on the board.
+        blue_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["blue"]]
+        yellow_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["yellow"]]
+        black_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["black"]]
+        red_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["red"]]
+        board_value -= blue_cubes
+        board_value -= yellow_cubes
+        board_value -= black_cubes
+        board_value -= red_cubes
+        #Increase the board value by 10 for each cure.
+        if GameBoard.cures[GameBoard.terms["blue"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["yellow"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["black"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["red"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        #Increase the board value by 0.5 per city connection of each research
+            #station
+        for i in xrange(len(GameBoard.research_stations)):
+            a = 0.5 * len(GameBoard.research_stations[0].city_connections)
+            board_value += a
+        #LEFT TO DO:
+        #Determine the shortest distance between any two research stations, and
+            #add +0.5 per city separating them
+        #Determine the number of cards of the same color in each player's hand
+
+    #Examine the GameBoard and check the hash of all gameboards to see if it's
+        #already been seen.  if it has, return that board's value
+
+    #If a win or lose condition, return its value
+        
+    #This is where we determine the 'best' board:
+        #Each cure counts as 10 cubes of that color
+        #Research stations count as 0.5 cube per distance from the next closest
+        #research station, plus 0.5 per city they're connected to.
+        #Each cube counts as 1.
+    #Generate a list of alternate board states based on each possible action
+    #Generate the next_player based on actions_left
+        #If next_player isn't the same player, reset actions_left to 1 for the
+        #RNG god, or 4 for the next actual player
+    #Generate a list of alternate board states for each of the above ones for
+    #each card that could be drawn- two in no particular order for player cards
+    #and two, three, or four infect cards, counting order.  This is
+    #computationally insane.
+
+    #For each alternate board state, get its value by calling this method on it
+    #Combine the values of each board state to get the highest one.
+        #If player is human, value(new state) = maximum of the board's values
+        #If the player is the RNG, the value of the board is determined by
+        #weighted chance
+    #Store the gameboard in the hashmap
+    #Return value of new state
+
 
 class GameBoard(object):
     terms = {"uncured": 0, "cured": 1, "eradicated": 2, "blue": 0, "yellow": 1,
@@ -83,6 +145,9 @@ class GameBoard(object):
                             "Beijing"]
         self.research_stations = [self.cities["Atlanta"],
                                   -1, -1, -1, -1, -1, -1]
+        self.map_grids = create_distances(self.cities)
+        self.distance_grid = self.map_grids[0]
+        self.previous_step_grid = self.map_grids[1]
         self.outbreak_marker = 0
         self.infection_rate_marker = 0
         self.one_quiet_night_marker = 0
@@ -96,7 +161,7 @@ class GameBoard(object):
         
 
     def epidemic_this_turn(Pandemic):
-        Pandemic.epidemic_drawn = true
+        Pandemic.epidemic_drawn = True
         
     def check_if_game_over(self):
         """
@@ -120,7 +185,7 @@ class GameBoard(object):
                 if self.cures[self.terms["yellow"]] > 0:
                     if self.cures[self.terms["black"]] > 0:
                         self.game_over = True
-                        self.reason_over = "Victory!"
+                        self.reason_over = "Victory!"        
         
 
 
@@ -1031,13 +1096,14 @@ class Player(object):
         self.actions = 4
         self.stored_card = 0
         self.hand = []
+        
 
 #This method creates a 2d array of distances.  It is detailed below the method.
 def create_distances(cities):
     distance = np.zeros(shape = (len(cities),len(cities)))
     previous = np.zeros(shape = (len(cities),len(cities)))
-    for home in xrange(len(cities)):
-        for destination in xrange(len(cities)):
+    for home in cities.iteritems():
+        for destination in cities.iteritems():
             if home == destination:
                 distance[home,destination] = 0
                 previous[home,destination] = destination
@@ -1047,8 +1113,8 @@ def create_distances(cities):
             else:
                 distance[home, destination] = 48
                 previous[home, destination] = -1
-    for intermediary in xrange(len(cities)):
-        for home in xrange(len(cities)):
+    for intermediary in cities.iteritems():
+        for home in cities.iteritems():
             for destination in xrange(len(cities)):
                 d1 = distance[home, intermediary]
                 d2 = distance[intermediary, destination]
@@ -1132,6 +1198,7 @@ class Pandemic(object):
         for i in xrange(player_count):
             #Create a new player with a random role
             self.player = Player(self.GameBoard.roles.pop())
+            self.player.location = self.GameBoard.cities["Atlanta"]
             #Deal the player a hand of cards
             for j in xrange(self.hand_size):
                 self.player.hand.append(self.GameBoard.player_deck.pop())
@@ -1196,6 +1263,12 @@ class Pandemic(object):
     def update_draw_chance(self):
         for city_name in self.GameBoard.cities.keys():
             self.GameBoard.cities[city_name].find_draw_chance(self.GameBoard)
+
+    def draw_board(self):
+        for city_tuple in self.GameBoard.cities.iteritems():
+            self.city = self.GameBoard.cities[city_tuple[0]]
+            self.city.print_city()
+            print
         
             
            
@@ -1214,6 +1287,10 @@ def infection_stage(GameBoard, Players):
     GameBoard.cities[index].infect(GameBoard, Players)
     #Discard the drawn card to the Infect Discard Pile
     GameBoard.infect_discard.append(index)
+    #if the card is in the Intensify pile, remove it.
+    if index in GameBoard.intensify_pile:
+        i = GameBoard.intensify_pile.index(index)
+        GameBoard.intensify_pile.pop(i);
     #Clear the outbreak list again, because we aren't done yet.
     GameBoard.outbreak_list = []
     #Rinse and repeat at least once.
@@ -1222,13 +1299,13 @@ def infection_stage(GameBoard, Players):
     GameBoard.infect_discard.append(index)
     GameBoard.outbreak_list = []
     #If the infection rate is 2 or more, infect one more city
-    if GameBoard.infection_rate > 2:
+    if GameBoard.infection_rate_marker > 2:
         index = GameBoard.infect_deck.pop(0)
         GameBoard.cities[index].infect(GameBoard, Players)
         GameBoard.infect_discard.append(index)
         GameBoard.outbreak_list = []
     #If the Infection Rate is 6 or more, infect a fourth city.
-    if GameBoard.infection_rate > 5:
+    if GameBoard.infection_rate_marker > 5:
         index = GameBoard.infect_deck.pop(0)
         GameBoard.cities[index].infect(GameBoard, Players)
         GameBoard.infect_discard.append(index)
@@ -1238,15 +1315,12 @@ def infection_stage(GameBoard, Players):
 
 
 
-#This method is called when an Epidemic card is drawn by a player.  It takes no
-#   arguments (from anyone), and does what it wants.  More accurately, this
-#   method increments the Infection Rate marker by one, draws an Infect card
-#   from the bottom of the Infect Deck, infects that city three times, and then
-#   takes all the cards out of the Infection Discard pile, shuffles them, and
-#   puts them back ontop of the Infect Deck so they can be drawn again and
-#   really kick the player's teeth in.  This modifies the following Global
-#   Variables: gameBoard, infectionRateMarker, InfectDeck, InfectDiscard,
-#   Intensify, and EpidemicThisTurn.
+#This method is called when an Epidemic card is drawn by a player.  More
+#accurately, this method increments the Infection Rate marker by one, draws an
+#Infect card from the bottom of the Infect Deck, infects that city three times,
+#and then takes all the cards out of the Infection Discard pile, shuffles them,
+#and puts them back ontop of the Infect Deck so they can be drawn again and
+#really kick the player's teeth in.
 def epidemic(GameBoard, Players):
     #Note that an epidemic happened this turn
     GameBoard.epidemic_this_turn()
@@ -1268,7 +1342,7 @@ def epidemic(GameBoard, Players):
     while (len(GameBoard.infect_discard)>0):
         #grab one card from it at random
         card = GameBoard.infect_discard.pop(
-            np.random.random_integers(0,len(infectDiscard)-1))
+            np.random.random_integers(0,len(GameBoard.infect_discard)-1))
         #Add the card to the Intensify list so the AI will know it's coming up
         #very soon
         GameBoard.intensify.append(card)
@@ -1280,7 +1354,7 @@ def epidemic(GameBoard, Players):
     #And finally, if One Quiet Night hasn't been played...
     if GameBoard.one_quiet_night_marker == 0:
         #Infect.
-        infecton_stage(GameBoard, Players)
+        infection_stage(GameBoard, Players)
 
 
 
@@ -1855,10 +1929,11 @@ def update_game(GameBoard, player):
         discard(player)
 
     
-
-Game = Pandemic(2, 4)
-index = 0
+players = random.randint(2,4)
+difficulty = random.randint(4, 6)
+Game = Pandemic(players, difficulty)
 for city_tuple in Game.GameBoard.cities.iteritems():
     city = Game.GameBoard.cities[city_tuple[0]]
     city.print_city()
     print
+print players, difficulty
