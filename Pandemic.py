@@ -9,14 +9,10 @@ def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
         #Board value starts at 96- the total number of cubes
         board_value = 96
         #Reduce it by 1 for each cube on the board.
-        blue_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["blue"]]
-        yellow_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["yellow"]]
-        black_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["black"]]
-        red_cubes = 24 - GameBoard.cubes_remaining[GameBoard.terms["red"]]
-        board_value -= blue_cubes
-        board_value -= yellow_cubes
-        board_value -= black_cubes
-        board_value -= red_cubes
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["blue"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["yellow"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["black"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["red"]]
         #Increase the board value by 10 for each cure.
         if GameBoard.cures[GameBoard.terms["blue"]] > GameBoard.terms["uncured"]:
             boardValue += 10
@@ -29,31 +25,73 @@ def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
         #Increase the board value by 0.5 per city connection of each research
             #station
         for i in xrange(len(GameBoard.research_stations)):
-            a = 0.5 * len(GameBoard.research_stations[0].city_connections)
-            board_value += a
-        #LEFT TO DO:
-        #Determine the shortest distance between any two research stations, and
-            #add +0.5 per city separating them
+            a = len(GameBoard.research_stations[i].city_connections)
+            distance = 12
+            station_name = GameBoard.research_stations[i].name
+            station_index = GameBoard.city_index.index(station_name)
+            #And by +0.5 more per city between each station and the next-closest
+            #research station; the more spread out they are, the better.
+            for j in xrange(len(GameBoard.research_stations)):
+                if i != j:
+                    station_2_name = GameBoard.research_stations[j].name
+                    station_2_index = GameBoard.city_index.index(station_2_name)
+                    if distance > GameBoard.distance[station_index, station_2_index]:
+                        distance = GameBoard.distance[station_index, station_2_index]
+            a += distance
+            board_value += (int) (0.5 * a)
+            
+        
         #Determine the number of cards of the same color in each player's hand
+        #and give +1 to the board state per player with 3 cards of the same
+        #color card in their hand; +5 for 4, and +8 for 5; scientists are the
+        #same, except with 1 card less for each value.
+        player_list = Pandemic.Players
+        for i in xrange(len(player_list)):
+            hand = player_list[i].hand
+            count = 0
+            for j in xrange(len(hand)):
+                if j < len(hand):
+                    color_1 = GameBoard.cities[hand[j]].color
+                    color_2 = GameBoard.cities[hand[j+1]].color
+                    if color_1 == color_2:
+                        count += 1
+            if player_list[i].role == "Scientist":
+                if count == 2:
+                    board_value += 1
+                elif count == 3:
+                    board_value += 3
+                elif count == 4:
+                    board_value += 5
+                    #If the player has enough cards for a cure and is in a city
+                    #with a research station, they can cure next turn and should
+                    #grant a bonus to that board state.
+                    location = GameBoard.cities[player_list[i].location]
+                    if location in GameBoard.research_stations:
+                        board_value += 2
+            else:
+                if count == 3:
+                    board_value += 1
+                elif count == 4:
+                    board_value += 3
+                elif count == 5:
+                    board_value += 5
+                    location = GameBoard.cities[player_list[i].location]
+                    if location in GameBoard.research_stations:
+                        board_value += 2
 
     #Examine the GameBoard and check the hash of all gameboards to see if it's
         #already been seen.  if it has, return that board's value
 
     #If a win or lose condition, return its value
         
-    #This is where we determine the 'best' board:
-        #Each cure counts as 10 cubes of that color
-        #Research stations count as 0.5 cube per distance from the next closest
-        #research station, plus 0.5 per city they're connected to.
-        #Each cube counts as 1.
+    
     #Generate a list of alternate board states based on each possible action
     #Generate the next_player based on actions_left
         #If next_player isn't the same player, reset actions_left to 1 for the
         #RNG god, or 4 for the next actual player
     #Generate a list of alternate board states for each of the above ones for
-    #each card that could be drawn- two in no particular order for player cards
-    #and two, three, or four infect cards, counting order.  This is
-    #computationally insane.
+    #each card that could be drawn- two, three, or four infect cards, counting
+    #order.  This is computationally insane.
 
     #For each alternate board state, get its value by calling this method on it
     #Combine the values of each board state to get the highest one.
@@ -63,6 +101,43 @@ def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
     #Store the gameboard in the hashmap
     #Return value of new state
 
+    #This will generate 10^49 different board states every turn, assuming each
+        #turn is as simple as the very first one.  Heuristics are the only
+        #way to go, and they're beyond me.
+
+def action_check(player, GameBoard):
+    location = GameBoard.cities[player.location]
+    hand = player.hand
+    #For each player, possible actions include:
+    #1: Walk to each neighboring city from the one it is in (avg 4)
+    #2: direct flight to each city in the player's hand (avg 4)
+    #3: if this city's card is in their hand (1 in 5 chance, on average)
+        #3A: Build a research station here
+        #3B: charter flight to each other city on the map (47 options)
+    #4: if there is a research station here (1 in 24 chance on average)
+        #4a: shuttle flight to each other research station (up to 6)
+        #4b: if Operations, operations flight to each other city, discarding
+            #each card in hand for each (47 other cities, up to 7 cards in hand,
+            #so 329)
+        #4c: if cards in hand, cure disease
+    #5: If Dispatcher, for each Player:
+        #5a: walk to each neighboring city from the one its in (avg 4 per player,
+            #so avg 12)
+        #5B: dispatcher flight to each other player (avg 6)
+    #6: if in same place as any other player (1/24 chance)
+        #6a: if you have the city card for the city you're in: (1/5 chance)
+            #6aa: give card to other player
+        #6b: if they have the city card for the city you're in:
+            #6ba: take card from other player
+        #6c: if you are a researcher
+            #6ca: give each card in your hand to other player (up to 7)
+        #6d: if they are a researcher
+            #6da: take each card in their hand (up to 7)
+    #7: Treat disease (up to 4)
+    #8: if contingency, draw card from the discard pile (up to 5).
+    #In total, this means that the very first player on the very first turn
+        #of the game has 839,808 different first turns
+    
 
 class GameBoard(object):
     terms = {"uncured": 0, "cured": 1, "eradicated": 2, "blue": 0, "yellow": 1,
@@ -71,6 +146,9 @@ class GameBoard(object):
              "Quarantine", "Researcher", "Scientist"]
     events = {"Epidemic": -1, "Government Grant": 48, "Airlift": 49,
               "Forecast": 50, "One Quiet Night": 51, "Resilient Population": 52}
+    actions = ["walk", "direct flight", "charter flight", "shuttle flight",
+               "dispatch flight", "operations flight", "give knowledge",
+               "take knowledge", "cure", "treat", "contingency"]
 
     def __init__(self, Pandemic):
         self.Pandemic = Pandemic
@@ -82,70 +160,82 @@ class GameBoard(object):
         """
         self.game_over = False
         self.cities = collections.OrderedDict(
-            {"Atlanta": Atlanta("Atlanta"),
-             "Washington": Washington("Washington"),
-             "San Francisco": SanFrancisco("San Francisco"),
-             "Chicago": Chicago("Chicago"),
-             "Montreal": Montreal("Montreal"), "New York": NewYork("New York"),
-             "London": London("London"), "Madrid": Madrid("Madrid"),
-             "Paris": Paris("Paris"), "Essen": Essen("Essen"),
-             "Milan": Milan("Milan"),
-             "St. Petersburg": StPetersburg( "St. Petersburg"),
-             "Los Angeles": LosAngeles("Los Angeles"),
-             "Mexico City": MexicoCity("Mexico City"), "Miami": Miami("Miami"),
-             "Bogota": Bogota("Bogota"), "Lima": Lima("Lima"),
-             "Santiago": Santiago("Santiago"),
-             "Buenos Aires": BuenosAires("Buenos Aires"),
-             "Sao Paulo": SaoPaulo("Sao Paulo"), "Lagos": Lagos("Lagos"),
-             "Kinsasha": Kinsasha("Kinsasha"),
-             "Johannesburg": Johannesburg("Johannesburg"),
-             "Khartoum": Khartoum("Khartoum"), "Algiers": Algiers("Algiers"),
-             "Cairo": Cairo("Cairo"), "Istanbul": Istanbul("Istanbul"),
-             "Moscow": Moscow("Moscow"), "Baghdad": Baghdad("Baghdad"),
-             "Riyadh": Riyadh("Riyadh"), "Tehran": Tehran("Tehran"),
-             "Karachi": Karachi("Karachi"), "Mumbai": Mumbai("Mumbai"),
-             "Delhi": Delhi("Delhi"), "Chennai": Chennai("Chennai"),
-             "Kolkata": Kolkata("Kolkata"), "Bangkok": Bangkok("Bangkok"),
-             "Jakarta": Jakarta("Jakarta"), "Sydney": Sydney("Sydney"),
-             "Ho Chi Minh City": HoChiMinhCity("Ho Chi Minh City"),
-             "Manila": Manila("Manila"), "Hong Kong": HongKong("Hong Kong"),
-             "Taipei": Taipei("Taipei"), "Osaka": Osaka("Osaka"),
-             "Tokyo": Tokyo("Tokyo"), "Seoul": Seoul("Seoul"),
-             "Shanghai": Shanghai("Shanghai"), "Beijing": Beijing("Beijing")})
+             Atlanta= Atlanta("Atlanta"), Washington= Washington("Washington"),
+             SanFrancisco= SanFrancisco("SanFrancisco"),
+             Chicago= Chicago("Chicago"), Montreal= Montreal("Montreal"),
+             NewYork= NewYork("NewYork"), London= London("London"),
+             Madrid= Madrid("Madrid"), Paris= Paris("Paris"),
+             Essen= Essen("Essen"), Milan= Milan("Milan"),
+             StPetersburg= StPetersburg("StPetersburg"),
+             LosAngeles= LosAngeles("LosAngeles"),
+             MexicoCity= MexicoCity("MexicoCity"), Miami= Miami("Miami"),
+             Bogota= Bogota("Bogota"), Lima= Lima("Lima"),
+             Santiago= Santiago("Santiago"),
+             BuenosAires= BuenosAires("BuenosAires"),
+             SaoPaulo= SaoPaulo("SaoPaulo"), Lagos= Lagos("Lagos"),
+             Kinsasha= Kinsasha("Kinsasha"),
+             Johannesburg= Johannesburg("Johannesburg"),
+             Khartoum= Khartoum("Khartoum"), Algiers= Algiers("Algiers"),
+             Cairo= Cairo("Cairo"), Istanbul= Istanbul("Istanbul"),
+             Moscow= Moscow("Moscow"), Baghdad= Baghdad("Baghdad"),
+             Riyadh= Riyadh("Riyadh"), Tehran= Tehran("Tehran"),
+             Karachi= Karachi("Karachi"), Mumbai= Mumbai("Mumbai"),
+             Delhi= Delhi("Delhi"), Chennai= Chennai("Chennai"),
+             Kolkata= Kolkata("Kolkata"), Bangkok= Bangkok("Bangkok"),
+             Jakarta= Jakarta("Jakarta"), Sydney= Sydney("Sydney"),
+             HoChiMinhCity= HoChiMinhCity("HoChiMinhCity"),
+             Manila= Manila("Manila"), HongKong= HongKong("HongKong"),
+             Taipei= Taipei("Taipei"), Osaka= Osaka("Osaka"),
+             Tokyo= Tokyo("Tokyo"), Seoul= Seoul("Seoul"),
+             Shanghai= Shanghai("Shanghai"), Beijing= Beijing("Beijing"))
 
-        self.player_deck = ["Atlanta", "Washington", "San Francisco",
-                            "Chicago", "Montreal", "New York", "London",
+        self.city_index =["Atlanta", "Washington", "SanFrancisco", "Chicago",
+                          "Montreal", "NewYork", "London", "Madrid", "Paris",
+                          "Essen", "Milan", "StPetersburg", "LosAngeles",
+                          "MexicoCity", "Miami", "Bogota", "Lima", "Santiago",
+                          "BuenosAires", "SaoPaulo", "Lagos", "Kinsasha",
+                          "Johannesburg", "Khartoum", "Algiers", "Cairo",
+                          "Istanbul", "Moscow", "Baghdad", "Riyadh", "Tehran",
+                          "Karachi", "Mumbai", "Delhi", "Chennai", "Kolkata",
+                          "Bangkok", "Jakarta", "Sydney", "HoChiMinhCity",
+                          "Manila", "HongKong", "Taipei", "Osaka", "Tokyo",
+                          "Seoul", "Shanghai", "Beijing"]
+    
+        self.player_deck = ["Atlanta", "Washington", "SanFrancisco",
+                            "Chicago", "Montreal", "NewYork", "London",
                             "Madrid", "Paris", "Essen", "Milan",
-                            "St. Petersburg", "Los Angeles", "Mexico City",
+                            "StPetersburg", "LosAngeles", "MexicoCity",
                             "Miami", "Bogota", "Lima", "Santiago",
-                            "Buenos Aires", "Sao Paulo", "Lagos",
+                            "BuenosAires", "SaoPaulo", "Lagos",
                             "Kinsasha", "Johannesburg", "Khartoum",
                             "Algiers", "Cairo", "Istanbul", "Moscow",
                             "Baghdad", "Riyadh", "Tehran", "Karachi",
                             "Mumbai", "Delhi", "Chennai", "Kolkata",
                             "Bangkok", "Jakarta", "Sydney",
-                            "Ho Chi Minh City", "Manila", "Hong Kong",
+                            "HoChiMinhCity", "Manila", "HongKong",
                             "Taipei", "Osaka", "Tokyo", "Seoul", "Shanghai",
                             "Beijing", "Government Grant", "Airlift",
                             "Forecast", "One Quiet Night",
                             "Resilient Population"]
-        self.infect_deck = ["Atlanta", "Washington", "San Francisco",
-                            "Chicago", "Montreal", "New York", "London",
+        
+        self.infect_deck = ["Atlanta", "Washington", "SanFrancisco",
+                            "Chicago", "Montreal", "NewYork", "London",
                             "Madrid", "Paris", "Essen", "Milan",
-                            "St. Petersburg", "Los Angeles", "Mexico City",
+                            "StPetersburg", "LosAngeles", "MexicoCity",
                             "Miami", "Bogota", "Lima", "Santiago",
-                            "Buenos Aires", "Sao Paulo", "Lagos",
+                            "BuenosAires", "SaoPaulo", "Lagos",
                             "Kinsasha", "Johannesburg", "Khartoum",
                             "Algiers", "Cairo", "Istanbul", "Moscow",
                             "Baghdad", "Riyadh", "Tehran", "Karachi",
                             "Mumbai", "Delhi", "Chennai", "Kolkata",
                             "Bangkok", "Jakarta", "Sydney",
-                            "Ho Chi Minh City", "Manila", "Hong Kong",
+                            "HoChiMinhCity", "Manila", "HongKong",
                             "Taipei", "Osaka", "Tokyo", "Seoul", "Shanghai",
                             "Beijing"]
+        
         self.research_stations = [self.cities["Atlanta"],
                                   -1, -1, -1, -1, -1, -1]
-        self.map_grids = create_distances(self.cities)
+        self.map_grids = create_distances(self.cities, self.city_index)
         self.distance_grid = self.map_grids[0]
         self.previous_step_grid = self.map_grids[1]
         self.outbreak_marker = 0
@@ -480,7 +570,7 @@ class Washington(City):
         self.city_connections = {"Washington": 0,
                                  "Atlanta": 1,
                                  "Montreal": 1,
-                                 "New York": 1}
+                                 "NewYork": 1}
 class SanFrancisco(City):
     def __init__(self, name):
         self.name = name
@@ -489,10 +579,10 @@ class SanFrancisco(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"San Francisco": 0,
+        self.city_connections = {"SanFrancisco": 0,
                                  "Tokyo": 1,
                                  "Manila": 1,
-                                 "Los Angeles": 1,
+                                 "LosAngeles": 1,
                                  "Chicago": 1}
 class Chicago(City):
     def __init__(self, name):
@@ -503,10 +593,10 @@ class Chicago(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Chicago": 0,
-                                 "San Francisco": 1,
-                                 "Mexico City": 1,
+                                 "SanFrancisco": 1,
+                                 "MexicoCity": 1,
                                  "Atlanta": 1,
-                                 "Los Angeles": 1,
+                                 "LosAngeles": 1,
                                  "Montreal": 1}
 class Montreal(City):
     def __init__(self, name):
@@ -519,7 +609,7 @@ class Montreal(City):
         self.city_connections = {"Montreal": 0,
                                  "Chicago": 1,
                                  "Washington": 1,
-                                 "New York": 1}
+                                 "NewYork": 1}
 class NewYork(City):
     def __init__(self, name):
         self.name = name
@@ -528,7 +618,7 @@ class NewYork(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"New York": 0,
+        self.city_connections = {"NewYork": 0,
                                  "Montreal": 1,
                                  "Washington": 1,
                                  "London": 1,
@@ -542,7 +632,7 @@ class London(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"London": 0,
-                                 "New York": 1,
+                                 "NewYork": 1,
                                  "Madrid": 1,
                                  "Paris": 1,
                                  "Essen": 1}
@@ -555,9 +645,9 @@ class Madrid(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Madrid": 0,
-                                 "New York": 1,
+                                 "NewYork": 1,
                                  "London": 1,
-                                 "Sao Paulo": 1,
+                                 "SaoPaulo": 1,
                                  "Algiers": 1,
                                  "Paris": 1}
 class Paris(City):
@@ -586,7 +676,7 @@ class Essen(City):
                                  "London": 1,
                                  "Paris": 1,
                                  "Milan": 1,
-                                 "St. Petersburg": 1}
+                                 "StPetersburg": 1}
 class Milan(City):
     def __init__(self, name):
         self.name = name
@@ -608,7 +698,7 @@ class StPetersburg(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"St. Petersburg": 0,
+        self.city_connections = {"StPetersburg": 0,
                                  "Essen": 1,
                                  "Istanbul": 1,
                                  "Moscow": 1}
@@ -621,8 +711,8 @@ class LosAngeles(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Los Angeles": 0,
-                                 "San Francisco": 1,
+        self.city_connections = {"LosAngeles": 0,
+                                 "SanFrancisco": 1,
                                  "Mexico City": 1,
                                  "Chicago": 1,
                                  "Sydney": 1}
@@ -635,8 +725,8 @@ class MexicoCity(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Mexico City": 0,
-                                 "Los Angeles": 1,
+        self.city_connections = {"MexicoCity": 0,
+                                 "LosAngeles": 1,
                                  "Chicago": 1,
                                  "Miami": 1,
                                  "Lima": 1,
@@ -650,7 +740,7 @@ class Miami(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Miami": 0,
-                                 "Mexico City": 1,
+                                 "MexicoCity": 1,
                                  "Bogota": 1,
                                  "Atlanta": 1,
                                  "Washington": 1}
@@ -663,10 +753,10 @@ class Bogota(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Bogota": 0,
-                                 "Mexico City": 1,
+                                 "MexicoCity": 1,
                                  "Lima": 1,
-                                 "Buenos Aires": 1,
-                                 "Sao Paulo": 1,
+                                 "BuenosAires": 1,
+                                 "SaoPaulo": 1,
                                  "Miami": 1}
 class Lima(City):
     def __init__(self, name):
@@ -677,7 +767,7 @@ class Lima(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Lima": 0,
-                                 "Mexico City": 1,
+                                 "MexicoCity": 1,
                                  "Bogota": 1,
                                  "Santiago": 1}
 class Santiago(City):
@@ -698,9 +788,9 @@ class BuenosAires(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Buenos Aires": 0,
+        self.city_connections = {"BuenosAires": 0,
                                  "Bogota": 1,
-                                 "Sao Paulo": 1}
+                                 "SaoPaulo": 1}
 class SaoPaulo(City):
     def __init__(self, name):
         self.name = name
@@ -709,9 +799,9 @@ class SaoPaulo(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Sao Paulo": 0,
+        self.city_connections = {"SaoPaulo": 0,
                                  "Bogota": 1,
-                                 "Buenos Aires": 1,
+                                 "BuenosAires": 1,
                                  "Madrid": 1,
                                  "Lagos": 1}
 class Lagos(City):
@@ -723,7 +813,7 @@ class Lagos(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Lagos": 0,
-                                 "Sao Paulo": 1,
+                                 "SaoPaulo": 1,
                                  "Kinsasha": 1,
                                  "Khartoum": 1}
 
@@ -804,7 +894,7 @@ class Istanbul(City):
                                  "Cairo": 1,
                                  "Baghdad": 1,
                                  "Moscow": 1,
-                                 "St. Petersburg": 1}
+                                 "StPetersburg": 1}
 
 class Moscow(City):
     def __init__(self, name):
@@ -815,7 +905,7 @@ class Moscow(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Moscow": 0,
-                                 "St. Petersburg": 1,
+                                 "StPetersburg": 1,
                                  "Istanbul": 1,
                                  "Tehran": 1}
 
@@ -930,7 +1020,7 @@ class Kolkata(City):
                                  "Delhi": 1,
                                  "Chennai": 1,
                                  "Bangkok": 1,
-                                 "Hong Kong": 1}
+                                 "HongKong": 1}
 class Bangkok(City):
     def __init__(self, name):
         self.name = name
@@ -943,8 +1033,8 @@ class Bangkok(City):
                                  "Kolkata": 1,
                                  "Chennai": 1,
                                  "Jakarta": 1,
-                                 "Ho Chi Minh City": 1,
-                                 "Hong Kong": 1}
+                                 "HoChiMinhCity": 1,
+                                 "HongKong": 1}
 class Jakarta(City):
     def __init__(self, name):
         self.name = name
@@ -957,8 +1047,8 @@ class Jakarta(City):
                                  "Chennai": 1,
                                  "Sydney": 1,
                                  "Kolkata": 1,
-                                 "Ho Chi Minh City": 1,
-                                 "Hong Kong": 1}
+                                 "HoChiMinhCity": 1,
+                                 "HongKong": 1}
 class Sydney(City):
     def __init__(self, name):
         self.name = name
@@ -970,7 +1060,7 @@ class Sydney(City):
         self.city_connections = {"Sydney": 0,
                                  "Jakarta": 1,
                                  "Manila": 1,
-                                 "Los Angeles": 1}
+                                 "LosAngeles": 1}
 
 class HoChiMinhCity(City):
     def __init__(self, name):
@@ -980,11 +1070,11 @@ class HoChiMinhCity(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Ho Chi Minh City": 0,
+        self.city_connections = {"HoChiMinhCity": 0,
                                  "Bangkok": 1,
                                  "Jakarta": 1,
                                  "Manila": 1,
-                                 "Hong Kong": 1}
+                                 "HongKong": 1}
 class Manila(City):
     def __init__(self, name):
         self.name = name
@@ -994,11 +1084,11 @@ class Manila(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Manila": 0,
-                                 "Ho Chi Minh City": 1,
+                                 "HoChiMinhCity": 1,
                                  "Sydney": 1,
-                                 "San Francisco": 1,
+                                 "SanFrancisco": 1,
                                  "Taipei": 1,
-                                 "Hong Kong": 1}
+                                 "HongKong": 1}
 class HongKong(City):
     def __init__(self, name):
         self.name = name
@@ -1007,8 +1097,8 @@ class HongKong(City):
         self.cubes_placed = 1
         self.draw_chance = 0
         self.research_station = 0
-        self.city_connections = {"Hong Kong": 0,
-                                 "Ho Chi Minh City": 1,
+        self.city_connections = {"HongKong": 0,
+                                 "HoChiMinhCity": 1,
                                  "Bangkok": 1,
                                  "Kolkata": 1,
                                  "Manila": 1,
@@ -1023,7 +1113,7 @@ class Taipei(City):
         self.draw_chance = 0
         self.research_station = 0
         self.city_connections = {"Taipei": 0,
-                                 "Hong Kong": 1,
+                                 "HongKong": 1,
                                  "Osaka": 1,
                                  "Manila": 1,
                                  "Shanghai": 1}
@@ -1049,7 +1139,7 @@ class Tokyo(City):
         self.city_connections = {"Tokyo": 0,
                                  "Seoul": 1,
                                  "Osaka": 1,
-                                 "San Francisco": 1,
+                                 "SanFrancisco": 1,
                                  "Shanghai": 1}
 class Seoul(City):
     def __init__(self, name):
@@ -1076,7 +1166,7 @@ class Shanghai(City):
                                  "Seoul": 1,
                                  "Tokyo": 1,
                                  "Taipei": 1,
-                                 "Hong Kong": 1}
+                                 "HongKong": 1}
 class Beijing(City):
     def __init__(self, name):
         self.name = name
@@ -1099,37 +1189,45 @@ class Player(object):
         
 
 #This method creates a 2d array of distances.  It is detailed below the method.
-def create_distances(cities):
-    distance = np.zeros(shape = (len(cities),len(cities)))
-    previous = np.zeros(shape = (len(cities),len(cities)))
-    for home in cities.iteritems():
-        for destination in cities.iteritems():
+def create_distances(cities, city_index):
+    size = len(cities)
+    distance = np.zeros(shape = (size,size), dtype=object)
+    previous = np.zeros(shape = (size,size), dtype=object)
+    for home_name, home in cities.iteritems():
+        for destination_name, destination in cities.iteritems():
+            home_index = city_index.index(home_name)
+            destination_index = city_index.index(destination_name)
             if home == destination:
-                distance[home,destination] = 0
-                previous[home,destination] = destination
+                distance[home_index,destination_index] = 0
+                previous[home_index,destination_index] = destination_index
             elif destination in home.city_connections:
-                distance[home,destination] = 1
-                previous[home,destination] = home
+                distance[home_index,destination_index] = 1
+                previous[home_index,destination_index] = home_index
             else:
-                distance[home, destination] = 48
-                previous[home, destination] = -1
-    for intermediary in cities.iteritems():
-        for home in cities.iteritems():
-            for destination in xrange(len(cities)):
-                d1 = distance[home, intermediary]
-                d2 = distance[intermediary, destination]
-                d3 = distance[home, destination]
+                distance[home_index,destination_index] = 48
+                previous[home_index,destination_index] = -1
+    for intermediary_name, intermediary in cities.iteritems():
+        for home_name, home in cities.iteritems():
+            for destination_name, destination in cities.iteritems():
+                home_index = city_index.index(home_name)
+                destination_index = city_index.index(destination_name)
+                intermediary_index = city_index.index(intermediary_name)
+                d1 = distance[home_index, intermediary_index]
+                d2 = distance[intermediary_index, destination_index]
+                d3 = distance[home_index, destination_index]
                 if d1 + d2 < d3:
                     d3 = d1 + d2
-                    distance[home, destination] = d3
-                    previous[home, destination] = intermediary
+                    distance[home_index, destination_index] = d3
+                    previous[home_index, destination_index] = intermediary_index
     return [distance, previous]
 
-def get_path(home, destination):
+def get_path(home, destination, GameBoard):
     if home == destination or destination in home.city_connections:
         return destination
     else:
-        get_path(home, previousStep[home, destination])
+        home_index = GameBoard.city_index.index(GameBoard.cities[home])
+        destination_index = GameBoard.city_index.index(GameBoard.cities[destination])
+        get_path(home, GameBoard.previous[home_index, destination_index])
 
 #distance grid:
 #J is the source city, I is the intermediary, K is the destination.
@@ -1198,7 +1296,7 @@ class Pandemic(object):
         for i in xrange(player_count):
             #Create a new player with a random role
             self.player = Player(self.GameBoard.roles.pop())
-            self.player.location = self.GameBoard.cities["Atlanta"]
+            self.player.location = "Atlanta"
             #Deal the player a hand of cards
             for j in xrange(self.hand_size):
                 self.player.hand.append(self.GameBoard.player_deck.pop())
