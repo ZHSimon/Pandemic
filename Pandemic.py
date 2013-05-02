@@ -2,150 +2,256 @@ import numpy as np
 import operator
 import collections
 import random
+import time
 
 
-def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
-    if depth == 0:
-        #Board value starts at 96- the total number of cubes
-        board_value = 96
-        #Reduce it by 1 for each cube on the board.
-        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["blue"]]
-        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["yellow"]]
-        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["black"]]
-        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["red"]]
-        #Increase the board value by 10 for each cure.
-        if GameBoard.cures[GameBoard.terms["blue"]] > GameBoard.terms["uncured"]:
-            boardValue += 10
-        if GameBoard.cures[GameBoard.terms["yellow"]] > GameBoard.terms["uncured"]:
-            boardValue += 10
-        if GameBoard.cures[GameBoard.terms["black"]] > GameBoard.terms["uncured"]:
-            boardValue += 10
-        if GameBoard.cures[GameBoard.terms["red"]] > GameBoard.terms["uncured"]:
-            boardValue += 10
-        #Increase the board value by 0.5 per city connection of each research
-            #station
-        for i in xrange(len(GameBoard.research_stations)):
-            a = len(GameBoard.research_stations[i].city_connections)
-            distance = 12
-            station_name = GameBoard.research_stations[i].name
-            station_index = GameBoard.city_index.index(station_name)
-            #And by +0.5 more per city between each station and the next-closest
-            #research station; the more spread out they are, the better.
-            for j in xrange(len(GameBoard.research_stations)):
-                if i != j:
-                    station_2_name = GameBoard.research_stations[j].name
-                    station_2_index = GameBoard.city_index.index(station_2_name)
-                    if distance > GameBoard.distance[station_index, station_2_index]:
-                        distance = GameBoard.distance[station_index, station_2_index]
-            a += distance
-            board_value += (int) (0.5 * a)
+#This is the main game loop
+def play(Pandemic):
+    while Pandemic.GameBoard.game_over == False:
+        active_player_index = 0
+        active_player = Pandemic.Players[active_player_index]
+        print "Player", active_player_index, "please choose an action!"
+        print "Please type 'What can I do?' to see a list of actions."
+        while active_player.actions > 0:
+            input = raw_input("Your action: ")
+            parse_action(Pandemic, active_player, input)
+            time.sleep(1)
             
-        
-        #Determine the number of cards of the same color in each player's hand
-        #and give +1 to the board state per player with 3 cards of the same
-        #color card in their hand; +5 for 4, and +8 for 5; scientists are the
-        #same, except with 1 card less for each value.
-        player_list = Pandemic.Players
-        for i in xrange(len(player_list)):
-            hand = player_list[i].hand
-            count = 0
-            for j in xrange(len(hand)):
-                if j < len(hand):
-                    color_1 = GameBoard.cities[hand[j]].color
-                    color_2 = GameBoard.cities[hand[j+1]].color
-                    if color_1 == color_2:
-                        count += 1
-            if player_list[i].role == "Scientist":
-                if count == 2:
-                    board_value += 1
-                elif count == 3:
-                    board_value += 3
-                elif count == 4:
-                    board_value += 5
-                    #If the player has enough cards for a cure and is in a city
-                    #with a research station, they can cure next turn and should
-                    #grant a bonus to that board state.
-                    location = GameBoard.cities[player_list[i].location]
-                    if location in GameBoard.research_stations:
-                        board_value += 2
+        print "Drawing two Player cards..."
+        #Set event_in_hand to false for the initial check
+        event_in_hand = False
+        #Check for events in the player's hand
+        for card in active_player.hand:
+            if Pandemic.GameBoard.events.count(card) > 0:
+                event_in_hand = True
+        #Draw a card
+        card = Pandemic.GameBoard.player_deck.pop(0)
+        #Epidemic check
+        if card == "Epidemic":
+            print "Epidemic has been drawn!"
+            #If the player has an event, let them have the chance to use it.
+            if event_in_hand:
+                print "Would you like to use an Event Card?"
+                input = raw_input("If not, type 'Pass': ")
+                parse_action(Pandemic, active_player, input)
+            #Call epidemic, check for game over, and update the board
+            epidemic(Pandemic.GameBoard, Pandemic.Players)
+            Pandemic.GameBoard.check_if_game_over
+            Pandemic.draw_board()
+        #If it's not an epidemic, add it to their hand
+        else:
+            active_player.hand.append(card)
+            #And print their hand for good measure
+            for card in active_player.hand:
+                print card
+        #Set event_in_hand to false for the second check
+        event_in_hand = False
+        for card in active_player.hand:
+            if Pandemic.GameBoard.events.count(card) > 0:
+                event_in_hand = True
+        #And draw a second card.
+        card = Pandemic.GameBoard.player_deck.pop(0)
+        #Epidemic check
+        if card == "Epidemic":
+            print "Epidemic has been drawn!"
+            #If the player has an event, let them have the chance to use it.
+            if event_in_hand:
+                print "Would you like to use an Event Card?"
+                input = raw_input("If not, type 'Pass': ")
+                parse_action(Pandemic, active_player, input)
+            #Call epidemic, check for game over, and update the board
+            epidemic(Pandemic.GameBoard, Pandemic.Players)
+            Pandemic.GameBoard.check_if_game_over
+            Pandemic.draw_board()
+        #If it's not an epidemic, add it to their hand
+        else:
+            active_player.hand.append(card)
+            #And print their hand for good measure
+            for card in active_player.hand:
+                print card
+        #Set event_in_hand to false for the third check
+        event_in_hand = False
+        for card in active_player.hand:
+            if Pandemic.GameBoard.events.count(card) > 0:
+                event_in_hand = True
+        #If they have an event in hand before the Infect stage,
+        #give them a chance to use it
+        if event_in_hand:
+            print "Would you like to use an Event Card?"
+            input = raw_input("If not, type 'Pass': ")
+            parse_action(Pandemic, active_player, input)
+        #Then infect
+        print "Infecting cities..."
+        infection_stage(Pandemic.GameBoard, Pandemic.Players)
+        #Check for game over
+        Pandemic.GameBoard.check_if_game_over
+        #Draw the board
+        Pandemic.draw_board()
+        #And advance the turn to the next player.
+        active_player_index += 1
+        if active_player_index > len(Pandemic.Players):
+            active_player_index = 0
+
+def parse_action(Pandemic, player, input):
+    words = input.split()
+    location = player.location
+    home_city = Pandemic.GameBoard.cities[location]
+    if words[0] == "What":
+        allowable_actions(player, Pandemic)
+    elif words[0] == "Walk":
+        if words[1] == "to":
+            #one step walk
+            move_action(Pandemic.GameBoard, player, words[2])
+        else:
+            #Multi-step walk
+            move_player(Pandemic.GameBoard, player, words[3], words[1])
+    elif words[0] == "Fly":
+        #Direct flight
+        direct_flight(Pandemic.GameBoard, player, words[3])
+    elif words[0] == "Charter":
+        #Charter flight
+        charter_flight(Pandemic.GameBoard, player, words[3])
+    elif words[0] == "Shuttle":
+        #Shuttle flight
+        shuttle_flight(Pandemic.GameBoard, player, words[3])
+    elif words[0] == "Dispatcher:":
+        if words[0] == "Walk":
+            if words[2] == "to":
+                #one step walk
+                move_action(Pandemic.GameBoard, words[1], words[3], player)
             else:
-                if count == 3:
-                    board_value += 1
-                elif count == 4:
-                    board_value += 3
-                elif count == 5:
-                    board_value += 5
-                    location = GameBoard.cities[player_list[i].location]
-                    if location in GameBoard.research_stations:
-                        board_value += 2
+                #Multi-step walk
+                move_player(Pandemic.GameBoard, words[1], words[4], words[2],
+                            player)
+        elif words[0] == "Fly":
+            #Direct flight
+            direct_flight(Pandemic.GameBoard, words[1], words[4], player)
+        elif words[0] == "Charter":
+            #Charter flight
+            charter_flight(Pandemic.GameBoard, words[2], words[4], player)
+        elif words[0] == "Shuttle":
+            #Shuttle flight
+            shuttle_flight(Pandemic.GameBoard, words[2], words[4], player)
+    elif words[0] == "Discard":
+        #Operations Flight
+        index = player.hand.index(words[1])
+        operations_flight(Pandemic.GameBoard, player, words[5], index)
+    elif words[0] == "Give":
+        #Give Knowledge
+        index = player.hand.index(words[1])
+        give_knowledge(player, words[3], index)
+    elif words[0] == "Take":
+        #Take knowledge
+        other_player = Pandemic.Player[int(words[3])]
+        index = other_player.hand.index(words[1])
+        give_knowledge(words[3], player, index)
+    elif words[0] == "Treat":
+        #Treat
+        home_city.treat(player, Pandemic.GameBoard, words[1])
+    elif words[0] == "Cure":
+        #Cure
+        if player.role == "Scientist":
+            cure(Pandemic.GameBoard, player, words[4], words[5], words[6],
+                 words[7])
+        else:
+            cure(Pandemic.GameBoard, player, words[4], words[5], words[6],
+                 words[7], words[8])
+    elif words[0] == "Build":
+        #Build a research station
+        index = player.hand.index(location)
+        home_city.research(player, index, Pandemic.GameBoard)
+    elif words[0] == "Move":
+        #Move a research station
+        index = player.hand.index(location)
+        other_city = Pandemic.GameBoard.cities[words[4]]
+        home_city.research(player, index, Pandemic.GameBoard, other_city)
+    elif words[0] == "Pass":
+        return
+        #Pass the opportunity to use an Event card.
+    elif words[0] == "Examine":
+        if words[1] == "Player":
+            Pandemic.Players[int(words[2])].player_info()
+        else:
+            #Examine city.
+            Pandemic.GameBoard.cities[words[1]].print_city()
+    elif words[0] == "Use":
+        #Event cards
+        if words[1] == "Airlift":
+            #Airlift
+            target = Pandemic.Players[int(words[4])]
+            airlift(Pandemic.GameBoard, player, target, words[6])
+        elif words[1] == "Forecast":
+            #Forecast
+            forecast(Pandemic.GameBoard, player)
+        elif words[1] == "Government":
+            #Govgrant
+            if words[4] == "build":
+                gov_grant(Pandemic.GameBoard, player, words[9])
+            else:
+                other_city = Pandemic.GameBoard.cities[11]
+                gov_grant(Pandemic.GameBoard, player, words[9], other_city)
+        elif words[1] == "One":
+            #One Quiet Night
+            one_quiet_night(Pandemic.GameBoard, player)
+        elif words[1] == "Resilient":
+            #Resilient Population
+            resilient_population(Pandemic.GameBoard, player, words[5])
 
-    #Examine the GameBoard and check the hash of all gameboards to see if it's
-        #already been seen.  if it has, return that board's value
-
-    #If a win or lose condition, return its value
-        
-    
-    #Generate a list of alternate board states based on each possible action
-    #Generate the next_player based on actions_left
-        #If next_player isn't the same player, reset actions_left to 1 for the
-        #RNG god, or 4 for the next actual player
-    #Generate a list of alternate board states for each of the above ones for
-    #each card that could be drawn- two, three, or four infect cards, counting
-    #order.  This is computationally insane.
-
-    #For each alternate board state, get its value by calling this method on it
-    #Combine the values of each board state to get the highest one.
-        #If player is human, value(new state) = maximum of the board's values
-        #If the player is the RNG, the value of the board is determined by
-        #weighted chance
-    #Store the gameboard in the hashmap
-    #Return value of new state
-
-    #This will generate 10^49 different board states every turn, assuming each
-        #turn is as simple as the very first one.  Heuristics are the only
-        #way to go, and they're beyond me.
-
-def action_check(player, GameBoard):
-    location = GameBoard.cities[player.location]
-    hand = player.hand
-    #For each player, possible actions include:
-    #1: Walk to each neighboring city from the one it is in (avg 4)
-    #2: direct flight to each city in the player's hand (avg 4)
-    #3: if this city's card is in their hand (1 in 5 chance, on average)
-        #3A: Build a research station here
-        #3B: charter flight to each other city on the map (47 options)
-    #4: if there is a research station here (1 in 24 chance on average)
-        #4a: shuttle flight to each other research station (up to 6)
-        #4b: if Operations, operations flight to each other city, discarding
-            #each card in hand for each (47 other cities, up to 7 cards in hand,
-            #so 329)
-        #4c: if cards in hand, cure disease
-    #5: If Dispatcher, for each Player:
-        #5a: walk to each neighboring city from the one its in (avg 4 per player,
-            #so avg 12)
-        #5B: dispatcher flight to each other player (avg 6)
-    #6: if in same place as any other player (1/24 chance)
-        #6a: if you have the city card for the city you're in: (1/5 chance)
-            #6aa: give card to other player
-        #6b: if they have the city card for the city you're in:
-            #6ba: take card from other player
-        #6c: if you are a researcher
-            #6ca: give each card in your hand to other player (up to 7)
-        #6d: if they are a researcher
-            #6da: take each card in their hand (up to 7)
-    #7: Treat disease (up to 4)
-    #8: if contingency, draw card from the discard pile (up to 5).
-    #In total, this means that the very first player on the very first turn
-        #of the game has 839,808 different first turns
-    
+def help():
+    print "Commands:"
+    print "Note that for all commands, city names should not have spaces."
+    print "'St. Petersburg' will not work; use 'StPetersburg' instead."
+    print
+    print "Walk to Neighbor: 'Walk to [name of destination]'"
+    print "Multi-action Walk: 'Walk [number of steps] towards [name of"
+    print "destination]'"
+    print "Direct Flight*: 'Fly directly to [name of destination'"
+    print "Charter Flight*: 'Charter fly to [name of destination]'"
+    print "Shuttle Flight*: 'Shuttle fly to [name of destination]'"
+    print "*Optional: Dispatcher movement - add 'Dispatch:' to the beginning of"
+    print "the line, and [target player number] after the word 'Walk' or 'Fly'."
+    print "Operations Flight: 'Discard [name of card] to fly to [name of"
+    print "destination]'"
+    print
+    print "Give Knowledge: 'Give [name of card] to [name of other player]'"
+    print "Take Knowledge: 'Take [name of card] from [name of other player]'"
+    print "Note that only researchers can share cards for one city while in"
+    print "another city."
+    print
+    print "Treat a disease: 'Treat [color of disease tokens] in [name of city]'"
+    print "Cure a disease: 'Cure [color of disease] by discarding [first card"
+    print "name], [second card name], [third card name], [fourth card name], and"
+    print "[fifth card name]*'"
+    print "*Scientists may leave off the 5th card."
+    print "Build a Research Station*: 'Build research station in [name of"
+    print "destination]'"
+    print "Move a Research Station: 'Move research station in [name of home city]"
+    print "to [name of destination city]'"
+    print "Note: there must be 7 research stations on the board to do the above."
+    print
+    print
+    print "Meta Commands:"
+    print "Look at Player's Information: 'Examine Player [player number]'"
+    print "Look at a City's information: 'Examine [name of city]'"
+    print
+    print
+    print "Event Cards:"
+    print
+    print "Airlift: 'Use Airlift to fly [name of player] to [name of destination]'"
+    print "Forecast: 'Use Forecast'"
+    print "Government Grant: 'Use Government Grant to [build or move] a research"
+    print "station in [name of destination]'"
+    print "One Quiet Night: 'Use One Quiet Night'"
+    print "Resilient Population: 'Use Resilient Population to remove [name of"
+    print "infection card]'"
 
 class GameBoard(object):
     terms = {"uncured": 0, "cured": 1, "eradicated": 2, "blue": 0, "yellow": 1,
              "black": 2, "red": 3}
     roles = ["Contingency", "Dispatcher", "Medic", "Operations",
              "Quarantine", "Researcher", "Scientist"]
-    events = {"Epidemic": -1, "Government Grant": 48, "Airlift": 49,
-              "Forecast": 50, "One Quiet Night": 51, "Resilient Population": 52}
+    events = ["Epidemic", "Government Grant", "Airlift", "Forecast",
+              "One Quiet Night", "Resilient Population"]
     actions = ["walk", "direct flight", "charter flight", "shuttle flight",
                "dispatch flight", "operations flight", "give knowledge",
                "take knowledge", "cure", "treat", "contingency"]
@@ -275,7 +381,9 @@ class GameBoard(object):
                 if self.cures[self.terms["yellow"]] > 0:
                     if self.cures[self.terms["black"]] > 0:
                         self.game_over = True
-                        self.reason_over = "Victory!"        
+                        self.reason_over = "Victory!"
+
+    
         
 
 
@@ -455,42 +563,45 @@ class City(object):
         GameBoard.card_colors_remaining[color] += -1
         #Discard the card
         player_discard_pile.append(player.hand.pop(discard_index))
+        #Consume an action
+        player.actions += -1
 
 
     #The active player treats one color in this city.  Self is self, player
     #is the player treating the disease, GameBoard is Game Board, and color
     #is the color of the disease being treated.
     def treat(self, player, GameBoard, color):
-        #If there are no disease cubes of the chosen color, waste the action
-        if self.disease_tokens[color] < 1:
-            return
-        #If the disease is already cured, or the player is a medic
-        elif GameBoard.cures[color] > GameBoard.terms["uncured"]:
-            #Grab the number of cubes of the chosen color off the city
-            cubes = self.disease_tokens[color]
-            #Return them to the cubes_remaining pool
-            GameBoard.cubes_remaining[color] += cubes
-            #and wipe them off the city
-            self.disease_tokens[color] = 0
-            player.actions += -1
-            self.assess_risk(GameBoard)
-        #If the player is a medic...
-        elif  player.role == "Medic":
-            #Grab the number of cubes of the chosen color off the city
-            cubes = self.disease_tokens[color]
-            #Return them to the cubes_remaining pool
-            GameBoard.cubes_remaining[color] += cubes
-            #and wipe them off the city
-            self.disease_tokens[color] = 0
-            player.actions += -1
-            self.assess_risk(GameBoard)
-        #If the player is not a medic and the disease isn't cured
-        else:
-            #remove one cube and place it back in the cubes_remaining pool
-            self.disease_tokens[color] += -1
-            GameBoard.cubes_remaining[color] += 1
-            player.actions += -1
-            self.assess_risk(GameBoard)
+        if this == GameBoard.cities(player.location):
+            #If there are no disease cubes of the chosen color, return.
+            if self.disease_tokens[color] < 1:
+                return
+            #If the disease is already cured, or the player is a medic
+            elif GameBoard.cures[color] > GameBoard.terms["uncured"]:
+                #Grab the number of cubes of the chosen color off the city
+                cubes = self.disease_tokens[color]
+                #Return them to the cubes_remaining pool
+                GameBoard.cubes_remaining[color] += cubes
+                #and wipe them off the city
+                self.disease_tokens[color] = 0
+                player.actions += -1
+                self.assess_risk(GameBoard)
+            #If the player is a medic...
+            elif  player.role == "Medic":
+                #Grab the number of cubes of the chosen color off the city
+                cubes = self.disease_tokens[color]
+                #Return them to the cubes_remaining pool
+                GameBoard.cubes_remaining[color] += cubes
+                #and wipe them off the city
+                self.disease_tokens[color] = 0
+                player.actions += -1
+                self.assess_risk(GameBoard)
+            #If the player is not a medic and the disease isn't cured
+            else:
+                #remove one cube and place it back in the cubes_remaining pool
+                self.disease_tokens[color] += -1
+                GameBoard.cubes_remaining[color] += 1
+                player.actions += -1
+                self.assess_risk(GameBoard)
 
             
     #The game itself infects the city.  *args are, optionally, the color
@@ -713,7 +824,7 @@ class LosAngeles(City):
         self.research_station = 0
         self.city_connections = {"LosAngeles": 0,
                                  "SanFrancisco": 1,
-                                 "Mexico City": 1,
+                                 "MexicoCity": 1,
                                  "Chicago": 1,
                                  "Sydney": 1}
 
@@ -1187,6 +1298,18 @@ class Player(object):
         self.stored_card = 0
         self.hand = []
         
+    def player_info(self):
+        print "Role:          ", self.role
+        print "Location:      ", self.location
+        print "Hand:          ", self.hand
+        print "Actions left:  ", self.actions
+        if self.role == "Contingency":
+            print "Stored Event:  ", self.stored_card
+        elif self.role == "Operations":
+            print "Op. Flights:   ", self.stored_card
+        print
+        
+        
 
 #This method creates a 2d array of distances.  It is detailed below the method.
 def create_distances(cities, city_index):
@@ -1326,7 +1449,7 @@ class Pandemic(object):
                 #and reduce that count so it doesn't happen too many times.
                 self.remaining_cards += -1
             #Give it an epidemic
-            self.cut.append(self.GameBoard.events["Epidemic"])
+            self.cut.append("Epidemic")
             #Shuffle it, and add it to the combined cuts pile
             self.combined_cuts += shuffle(self.cut)
         #Lastly, update the GameBoard's player_deck.
@@ -1366,11 +1489,159 @@ class Pandemic(object):
         for city_tuple in self.GameBoard.cities.iteritems():
             self.city = self.GameBoard.cities[city_tuple[0]]
             self.city.print_city()
+            for i in xrange(len(self.Players)):
+                if self.Players[i].location == city_tuple[0]:
+                    print self.Players[i].role, "(",i,") is in this city."
             print
-        
+        print
+        print "Outbreak Marker: ", self.GameBoard.outbreak_marker
+        if self.GameBoard.outbreak_marker > 5:
+            print "If the outbreak marker reaches 8, the game ends!"
+        print
+        print "Infection Rate: ", self.GameBoard.infection_rate_marker
+        if self.GameBoard.one_quiet_night_marker != 0:
+            print "One Quiet Night in effect: no cities infected this turn"
+        elif self.GameBoard.infection_rate_marker < 3:
+            print "Cities infected per Turn: 2"
+        elif self.GameBoard.infection_rate_marker > 2:
+            print "Cities infected per Turn: 3"
+        elif self.GameBoard.infection_rate_marker > 5:
+            print "Cities infected per Turn: 4"
+        print
+        print "Cubes remaining (Blue, Yellow, Black, Red):"
+        print self.GameBoard.cubes_remaining
+        print
+        print "Cards of each color remaining (Blue, Yellow, Black, Red):"
+        print self.GameBoard.color_cards_remaining
+        print
+        print "Cures Found:"
+        if self.GameBoard.cures[0] == 0:
+            print "Blue: Uncured"
+        elif self.GameBoard.cures[0] == 1:
+            print "Blue: Cured"
+        elif self.GameBoard.cures[0] == 2:
+            print "Blue: Eradicated"
+        if self.GameBoard.cures[1] == 0:
+            print "Yellow: Uncured"
+        elif self.GameBoard.cures[1] == 1:
+            print "Yellow: Cured"
+        elif self.GameBoard.cures[1] == 2:
+            print "Yellow: Eradicated"
+        if self.GameBoard.cures[2] == 0:
+            print "Black: Uncured"
+        elif self.GameBoard.cures[2] == 1:
+            print "Black: Cured"
+        elif self.GameBoard.cures[2] == 2:
+            print "Black: Eradicated"
+        if self.GameBoard.cures[3] == 0:
+            print "Red: Uncured"
+        elif self.GameBoard.cures[3] == 1:
+            print "Red: Cured"
+        elif self.GameBoard.cures[3] == 2:
+            print "Red: Eradicated"
+        print
+        print "Cities in the Intensify Pile (likely to be drawn again soon):"
+        for i in self.GameBoard.intensify_list:
+            print i
+        print
+        print "Cities in the Infect Discard Pile:"
+        for i in self.GameBoard.infect_discard:
+            print i
+        print
+        print "Cities in the Player Discard Pile:"
+        for i in self.GameBoard.player_discard:
+            print i
+        print
+        for i in self.Players:
+            print i.player_info()
+       
             
-           
-
+def allowable_actions(active_player, Pandemic):
+    GameBoard = Pandemic.GameBoard
+    location = GameBoard.cities[active_player.location]
+    print "With this action, you can..."
+    for key in location.city_connections.keys():
+        print "Walk to", key
+    if len(active_player.hand) > 0:
+        for i in xrange(len(active_player.hand)):
+            if active_player.hand[i] in GameBoard.city_index:
+                print "Direct Fly to", active_player.hand[i]
+        for i in xrange(len(active_player.hand)):
+            if active_player.hand[i] in GameBoard.events:
+                print "Use", active_player.hand[i]
+        if active_player.location in active_player.hand:
+            if location.research_station == 0:
+                print "Build a Research Station at", active_player.location
+            else:
+                print "Charter Fly to any other city by discarding this city's card."
+                blues = 0
+                yellows = 0
+                blacks = 0
+                reds = 0
+                for i in xrange(len(active_player.hand)):
+                    if active_player.hand[i] in GameBoard.city_index:
+                        city = GameBoard.cities[active_player.hand[i]]
+                        if city.color == GameBoard.terms["blue"]:
+                            blues += 1
+                        elif city.color == GameBoard.terms["yellow"]:
+                            yellows += 1
+                        elif city.color == GameBoard.terms["black"]:
+                            blacks += 1
+                        elif city.color == GameBoard.terms["red"]:
+                            reds += 1
+                if active_player.role == GameBoard.roles["Scientist"]:
+                    if blues > 3:
+                        print "Cure Blue Disease!"
+                    if yellows > 3:
+                        print "Cure Yellow Disease!"
+                    if blacks > 3:
+                        print "Cure Black Disease!"
+                    if reds > 3:
+                        print "Cure Red Disease!"
+                else:
+                    if blues > 4:
+                        print "Cure Blue Disease!"
+                    if yellows > 4:
+                        print "Cure Yellow Disease!"
+                    if blacks > 4:
+                        print "Cure Black Disease!"
+                    if reds > 4:
+                        print "Cure Red Disease!"
+                if GameBoard.research_stations.count(-1) < 6:
+                    a = "Shuttle Fly to other cities with Research"
+                    b = " Stations, like: "
+                    a = a + b
+                    print a
+                    for i in GameBoard.research_stations:
+                        if i != location:
+                            print i.name
+                if active_player.role == GameBoard.roles["Operations"]:
+                    a = "Operations Fly to any other city by discarding"
+                    b = " any city's card!"
+                    a= a + b
+                    print a
+                    a = "The discarded card and the destination do not"
+                    b = " need to be the same."
+                    a = a + b
+                    print a
+                elif active_player.role == GameBoard.roles["Dispatcher"]:
+                    print "Move any other player as if they were your piece!"
+                elif active_player.role == GameBoard.roles["Contingency"]:
+                    if GameBoard.events in GameBoard.player_discard:
+                        print "Draw a used Event card from the Discard pile and attach it to your piece!"
+                if location.disease_tokens > [0,0,0,0]:
+                    print "Treat disease at your location."
+                for i in Pandemic.Players:
+                    if i.location == active_player.location:
+                        if i.role == "Researcher":
+                            print "Share any city card with the Researcher at your location."
+                        elif active_player.role == "Researcher":
+                            print "Share any city card with the other player at your location."
+                        else:
+                            if location.name in i.hand:
+                                print "Take the city card for your location from another player."
+                            elif location.name in active_player.hand:
+                                print "Give the city card for your location to another player."
 
 
 #This method is called at the end of every turn: it takes the infection rate
@@ -1694,7 +1965,7 @@ def operations_flight(GameBoard, player, destination_name, discard_index):
 #she can give any city card she damn well pleases to.  It takes, as arguments,
 #the player list of the giving player, the player list of the receiving player,
 #and the index number of the card being given in the giver's hand.
-def give_knowledge(GameBoard, giver, receiver, card_index):
+def give_knowledge(giver, receiver, card_index):
     #If the giver and receiver are in the same city, the giver is a Researcher,
     #and the giver has at least one action left this turn...
     if (giver.location == receiver.location):
@@ -1987,10 +2258,14 @@ def forecast(GameBoard, player):
 #arguments the player list of the unfortunate soul who has to discard a card.
 #It modifies the global variable playerDiscard.
 def discard(GameBoard, player):
-    #The AI has to choose which card to discard and I have no idea how to code
-    #that yet.  Event cards should be used instead of discarded, too...
-    #For now, randomness.
-    chosenCard = np.random.random_int(0, len(player.hand)-1)
+    for i in xrange(len(player.hand)):
+        print i, "-", player.hand[i]
+    need_discard = true
+    while (need_discard):
+        chosenCard = raw_input("Please choose a card to discard, by index number: ")
+        if chosenCard >=0 and chosenCard <= len(player.hand):
+            discard_needed = false
+    
     #Place the discarded card in the player discard pile.  Hey, this one works!
     GameBoard.player_discard.append(player.hand.pop(chosenCard))
 
@@ -2026,12 +2301,163 @@ def update_game(GameBoard, player):
         #And discard until it doesn't.
         discard(player)
 
+def analyze_board(Pandemic, GameBoard, Player, depth, actions_left):
+    if depth == 0:
+        #Board value starts at 96- the total number of cubes
+        board_value = 96
+        #Reduce it by 1 for each cube on the board.
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["blue"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["yellow"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["black"]]
+        board_value -= 24 - GameBoard.cubes_remaining[GameBoard.terms["red"]]
+        #Increase the board value by 10 for each cure.
+        if GameBoard.cures[GameBoard.terms["blue"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["yellow"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["black"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        if GameBoard.cures[GameBoard.terms["red"]] > GameBoard.terms["uncured"]:
+            boardValue += 10
+        #Increase the board value by 0.5 per city connection of each research
+            #station
+        for i in xrange(len(GameBoard.research_stations)):
+            a = len(GameBoard.research_stations[i].city_connections)
+            distance = 12
+            station_name = GameBoard.research_stations[i].name
+            station_index = GameBoard.city_index.index(station_name)
+            #And by +0.5 more per city between each station and the next-closest
+            #research station; the more spread out they are, the better.
+            for j in xrange(len(GameBoard.research_stations)):
+                if i != j:
+                    station_2_name = GameBoard.research_stations[j].name
+                    station_2_index = GameBoard.city_index.index(station_2_name)
+                    if distance > GameBoard.distance[station_index, station_2_index]:
+                        distance = GameBoard.distance[station_index, station_2_index]
+            a += distance
+            board_value += (int) (0.5 * a)
+            
+        
+        #Determine the number of cards of the same color in each player's hand
+        #and give +1 to the board state per player with 3 cards of the same
+        #color card in their hand; +5 for 4, and +8 for 5; scientists are the
+        #same, except with 1 card less for each value.
+        player_list = Pandemic.Players
+        for i in xrange(len(player_list)):
+            hand = player_list[i].hand
+            count = 0
+            for j in xrange(len(hand)):
+                if j < len(hand):
+                    color_1 = GameBoard.cities[hand[j]].color
+                    color_2 = GameBoard.cities[hand[j+1]].color
+                    if color_1 == color_2:
+                        count += 1
+            if player_list[i].role == "Scientist":
+                if count == 2:
+                    board_value += 1
+                elif count == 3:
+                    board_value += 3
+                elif count == 4:
+                    board_value += 5
+                    #If the player has enough cards for a cure and is in a city
+                    #with a research station, they can cure next turn and should
+                    #grant a bonus to that board state.
+                    location = GameBoard.cities[player_list[i].location]
+                    if location in GameBoard.research_stations:
+                        board_value += 2
+            else:
+                if count == 3:
+                    board_value += 1
+                elif count == 4:
+                    board_value += 3
+                elif count == 5:
+                    board_value += 5
+                    location = GameBoard.cities[player_list[i].location]
+                    if location in GameBoard.research_stations:
+                        board_value += 2
+
+    #Examine the GameBoard and check the hash of all gameboards to see if it's
+        #already been seen.  if it has, return that board's value
+
+    #If a win or lose condition, return its value
+        
     
-players = random.randint(2,4)
-difficulty = random.randint(4, 6)
-Game = Pandemic(players, difficulty)
-for city_tuple in Game.GameBoard.cities.iteritems():
-    city = Game.GameBoard.cities[city_tuple[0]]
-    city.print_city()
-    print
-print players, difficulty
+    #Generate a list of alternate board states based on each possible action
+    #Generate the next_player based on actions_left
+        #If next_player isn't the same player, reset actions_left to 1 for the
+        #RNG god, or 4 for the next actual player
+    #Generate a list of alternate board states for each of the above ones for
+    #each card that could be drawn- two, three, or four infect cards, counting
+    #order.  This is computationally insane.
+
+    #For each alternate board state, get its value by calling this method on it
+    #Combine the values of each board state to get the highest one.
+        #If player is human, value(new state) = maximum of the board's values
+        #If the player is the RNG, the value of the board is determined by
+        #weighted chance
+    #Store the gameboard in the hashmap
+    #Return value of new state
+
+    #This will generate 10^49 different board states every turn, assuming each
+        #turn is as simple as the very first one.  Heuristics are the only
+        #way to go, and they're beyond me.
+
+def action_check(player, GameBoard):
+    location = GameBoard.cities[player.location]
+    hand = player.hand
+    #For each player, possible actions include:
+    #1: Walk to each neighboring city from the one it is in (avg 4)
+    #2: direct flight to each city in the player's hand (avg 4)
+    #3: if this city's card is in their hand (1 in 5 chance, on average)
+        #3A: Build a research station here
+        #3B: charter flight to each other city on the map (47 options)
+    #4: if there is a research station here (1 in 24 chance on average)
+        #4a: shuttle flight to each other research station (up to 6)
+        #4b: if Operations, operations flight to each other city, discarding
+            #each card in hand for each (47 other cities, up to 7 cards in hand,
+            #so 329)
+        #4c: if cards in hand, cure disease
+    #5: If Dispatcher, for each Player:
+        #5a: walk to each neighboring city from the one its in (avg 4 per player,
+            #so avg 12)
+        #5B: dispatcher flight to each other player (avg 6)
+    #6: if in same place as any other player (1/24 chance)
+        #6a: if you have the city card for the city you're in: (1/5 chance)
+            #6aa: give card to other player
+        #6b: if they have the city card for the city you're in:
+            #6ba: take card from other player
+        #6c: if you are a researcher
+            #6ca: give each card in your hand to other player (up to 7)
+        #6d: if they are a researcher
+            #6da: take each card in their hand (up to 7)
+    #7: Treat disease (up to 4)
+    #8: if contingency, draw card from the discard pile (up to 5).
+    #In total, this means that the very first player on the very first turn
+        #of the game has 839,808 different first turns
+
+
+
+def start():
+    player_count = True
+    while player_count:
+        players = int(raw_input("How many players? (2, 3, or 4) "))
+        if players > 1 or players < 5:
+            player_count = False
+        else:
+            print "Not valid number of players."
+    difficulty_boolean = True
+    while difficulty_boolean:
+        difficulty = int(raw_input("How many Epidemics? (4, 5, or 6) "))
+        if difficulty >3 and difficulty < 7:
+            difficulty_boolean = False
+        else:
+            print "Not valid number of Epidemics."
+    Game = Pandemic(players, difficulty)
+    Game.draw_board()
+    play(Game)
+
+def start(players, difficulty):
+    Game = Pandemic(players, difficulty)
+    Game.draw_board()
+    help()
+    play(Game)
