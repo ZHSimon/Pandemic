@@ -3,6 +3,8 @@ import operator
 import collections
 import random
 import time
+import traceback
+import sys
 
 
 #This is the main game loop
@@ -13,9 +15,14 @@ def play(Pandemic):
         print "Player", active_player_index, "please choose an action!"
         print "Please type 'What can I do?' to see a list of actions."
         while active_player.actions > 0:
+            #try:
             input = raw_input("Your action: ")
             parse_action(Pandemic, active_player, input)
             time.sleep(1)
+            ##except TypeError:
+            ##    print "Type Error: ", sys.exc_info()
+##            except:
+##                print "Unknown Error: ", sys.exc_info()[0]
             
         print "Drawing two Player cards..."
         #Set event_in_hand to false for the initial check
@@ -43,7 +50,11 @@ def play(Pandemic):
             active_player.hand.append(card)
             #And print their hand for good measure
             for card in active_player.hand:
-                print card
+                if card in Pandemic.GameBoard.city_index:
+                    color = Pandemic.GameBoard.cities[card].color
+                    print card, "a", color, "city"
+                else:
+                    print card
         #Set event_in_hand to false for the second check
         event_in_hand = False
         for card in active_player.hand:
@@ -91,6 +102,7 @@ def play(Pandemic):
         active_player_index += 1
         if active_player_index > len(Pandemic.Players):
             active_player_index = 0
+        print "Player", active_player_index," can take their turn now."
 
 def parse_action(Pandemic, player, input):
     words = input.split()
@@ -104,7 +116,7 @@ def parse_action(Pandemic, player, input):
             move_action(Pandemic.GameBoard, player, words[2])
         else:
             #Multi-step walk
-            move_player(Pandemic.GameBoard, player, words[3], words[1])
+            move_player(Pandemic.GameBoard, player, words[4], int(words[1]))
     elif words[0] == "Fly":
         #Direct flight
         direct_flight(Pandemic.GameBoard, player, words[3])
@@ -115,23 +127,28 @@ def parse_action(Pandemic, player, input):
         #Shuttle flight
         shuttle_flight(Pandemic.GameBoard, player, words[3])
     elif words[0] == "Dispatcher:":
-        if words[0] == "Walk":
-            if words[2] == "to":
+        if words[1] == "Walk":
+            if words[3] == "to":
                 #one step walk
-                move_action(Pandemic.GameBoard, words[1], words[3], player)
+                move_action(Pandemic.GameBoard, int(words[2]), words[4], player)
             else:
                 #Multi-step walk
-                move_player(Pandemic.GameBoard, words[1], words[4], words[2],
-                            player)
-        elif words[0] == "Fly":
+                move_player(Pandemic.GameBoard, int(words[2]), words[6],
+                            words[3], player)
+        elif words[1] == "Fly":
             #Direct flight
-            direct_flight(Pandemic.GameBoard, words[1], words[4], player)
-        elif words[0] == "Charter":
+            target = Pandemic.Players[int(words[2])]
+            direct_flight(Pandemic.GameBoard, target, words[5], player)
+        elif words[1] == "Charter":
             #Charter flight
-            charter_flight(Pandemic.GameBoard, words[2], words[4], player)
-        elif words[0] == "Shuttle":
+            target = Pandemic.Players[int(words[3])]
+            charter_flight(Pandemic.GameBoard, target, words[5], player)
+        elif words[1] == "Shuttle":
             #Shuttle flight
-            shuttle_flight(Pandemic.GameBoard, words[2], words[4], player)
+            target = Pandemic.Players[int(words[3])]
+            shuttle_flight(Pandemic.GameBoard, target, words[5], player)
+        else:
+            return
     elif words[0] == "Discard":
         #Operations Flight
         index = player.hand.index(words[1])
@@ -169,11 +186,13 @@ def parse_action(Pandemic, player, input):
         return
         #Pass the opportunity to use an Event card.
     elif words[0] == "Examine":
-        if words[1] == "Player":
-            Pandemic.Players[int(words[2])].player_info()
-        else:
+        if words[1] == "Player" or words[1] == "player":
+            Pandemic.Players[int(words[2])].player_info(Pandemic.GameBoard)
+        elif words[1] in Pandemic.GameBoard.city_index:
             #Examine city.
             Pandemic.GameBoard.cities[words[1]].print_city()
+        else:
+            return
     elif words[0] == "Use":
         #Event cards
         if words[1] == "Airlift":
@@ -187,7 +206,7 @@ def parse_action(Pandemic, player, input):
             #Govgrant
             if words[4] == "build":
                 gov_grant(Pandemic.GameBoard, player, words[9])
-            else:
+            if words[4] == "move":
                 other_city = Pandemic.GameBoard.cities[11]
                 gov_grant(Pandemic.GameBoard, player, words[9], other_city)
         elif words[1] == "One":
@@ -196,21 +215,40 @@ def parse_action(Pandemic, player, input):
         elif words[1] == "Resilient":
             #Resilient Population
             resilient_population(Pandemic.GameBoard, player, words[5])
+        else:
+            return
+    elif words[0]=="Quit" or words[0] == "Exit":
+        exit()
+    elif words[0] == "Help" or words[0] == "help":
+        help()
+    else:
+        return
 
 def help():
     print "Commands:"
     print "Note that for all commands, city names should not have spaces."
     print "'St. Petersburg' will not work; use 'StPetersburg' instead."
     print
+    print "Player Movement:"
     print "Walk to Neighbor: 'Walk to [name of destination]'"
-    print "Multi-action Walk: 'Walk [number of steps] towards [name of"
+    print "Multi-action Walk: 'Walk [number of steps] steps towards [name of"
     print "destination]'"
-    print "Direct Flight*: 'Fly directly to [name of destination'"
-    print "Charter Flight*: 'Charter fly to [name of destination]'"
-    print "Shuttle Flight*: 'Shuttle fly to [name of destination]'"
-    print "*Optional: Dispatcher movement - add 'Dispatch:' to the beginning of"
-    print "the line, and [target player number] after the word 'Walk' or 'Fly'."
+    print "Direct Flight: 'Fly directly to [name of destination'"
+    print "Charter Flight: 'Charter fly to [name of destination]'"
+    print "Shuttle Flight: 'Shuttle fly to [name of destination]'"
     print "Operations Flight: 'Discard [name of card] to fly to [name of"
+    print "destination]'"
+    print
+    print "Dispatcher Movement:"
+    print "Walk to Neighbor: 'Dispatcher: Walk [player number] to [name of"
+    print "destination]'"
+    print "Multi-action Walk: 'Dispatcher: Walk [player number] [number of"
+    print "steps] steps towards [name of destination]'"
+    print "Direct Flight: 'Dispatcher: Fly [player number] directly to [name of"
+    print "destination]'"
+    print "Charter Flight: 'Dispatcher: Charter fly [player number] to [name of"
+    print "destination]'"
+    print "Shuttle Flight: 'Dispatcher: Shuttle fly [player name] to [name of"
     print "destination]'"
     print
     print "Give Knowledge: 'Give [name of card] to [name of other player]'"
@@ -247,7 +285,7 @@ def help():
 
 class GameBoard(object):
     terms = {"uncured": 0, "cured": 1, "eradicated": 2, "blue": 0, "yellow": 1,
-             "black": 2, "red": 3}
+             "black": 2, "red": 3, 0: "blue", 1: "yellow", 2: "black", 3: "red"}
     roles = ["Contingency", "Dispatcher", "Medic", "Operations",
              "Quarantine", "Researcher", "Scientist"]
     events = ["Epidemic", "Government Grant", "Airlift", "Forecast",
@@ -609,7 +647,7 @@ class City(object):
     def infect(self, GameBoard, Players, *args):
         #Grab the color to add, if there are any args.
         if (len(args)>0):
-            color = args[0]
+            color = int(args[0])
         #Otherwise use the city's own color.
         else:
             color = self.color
@@ -1298,10 +1336,18 @@ class Player(object):
         self.stored_card = 0
         self.hand = []
         
-    def player_info(self):
+    def player_info(self, GameBoard):
         print "Role:          ", self.role
         print "Location:      ", self.location
-        print "Hand:          ", self.hand
+        self.a = "Hand:           "
+        for card in self.hand:
+            if card in GameBoard.city_index:
+                self.color = GameBoard.cities[card].color
+                self.a += card + " ("+GameBoard.terms[self.color] + ")"
+            else:
+                self.a += card
+            self.a += ", "
+        print self.a
         print "Actions left:  ", self.actions
         if self.role == "Contingency":
             print "Stored Event:  ", self.stored_card
@@ -1407,6 +1453,7 @@ class Pandemic(object):
     def create_game(self, player_count, difficulty):
         #Make the board, and shuffle its player_deck, infect_deck, and roles.
         self.GameBoard = GameBoard(self)
+        self.GameBoard.reset_game()
         self.GameBoard.player_deck = shuffle(self.GameBoard.player_deck)
         self.GameBoard.infect_deck = shuffle(self.GameBoard.infect_deck)
         self.GameBoard.roles = shuffle(self.GameBoard.roles)
@@ -1419,6 +1466,7 @@ class Pandemic(object):
         for i in xrange(player_count):
             #Create a new player with a random role
             self.player = Player(self.GameBoard.roles.pop())
+            print "Player", i, "drew the", self.player.role, "card!"
             self.player.location = "Atlanta"
             #Deal the player a hand of cards
             for j in xrange(self.hand_size):
@@ -1466,11 +1514,14 @@ class Pandemic(object):
                 self.city.infect(self.GameBoard, self.Players)
                 self.city.infect(self.GameBoard, self.Players)
                 self.city.infect(self.GameBoard, self.Players)
+                print self.city.name, "is", self.GameBoard.terms[self.city.color], "and was infected thrice."
             elif i > 2 and i < 6:
                 self.city.infect(self.GameBoard, self.Players)
                 self.city.infect(self.GameBoard, self.Players)
+                print self.city.name, "is", self.GameBoard.terms[self.city.color], "and was infected twice."
             else:
                 self.city.infect(self.GameBoard, self.Players)
+                print self.city.name, "is", self.GameBoard.terms[self.city.color], "and was infected once."
         self.update_draw_chance()
 
     def find_epidemic_chance(self):
@@ -1553,7 +1604,7 @@ class Pandemic(object):
             print i
         print
         for i in self.Players:
-            print i.player_info()
+            print i.player_info(self.GameBoard)
        
             
 def allowable_actions(active_player, Pandemic):
@@ -1565,7 +1616,7 @@ def allowable_actions(active_player, Pandemic):
     if len(active_player.hand) > 0:
         for i in xrange(len(active_player.hand)):
             if active_player.hand[i] in GameBoard.city_index:
-                print "Direct Fly to", active_player.hand[i]
+                print "Fly directly to ", active_player.hand[i]
         for i in xrange(len(active_player.hand)):
             if active_player.hand[i] in GameBoard.events:
                 print "Use", active_player.hand[i]
@@ -1573,7 +1624,7 @@ def allowable_actions(active_player, Pandemic):
             if location.research_station == 0:
                 print "Build a Research Station at", active_player.location
             else:
-                print "Charter Fly to any other city by discarding this city's card."
+                print "Charter Fly to [any other city]"
                 blues = 0
                 yellows = 0
                 blacks = 0
@@ -1652,6 +1703,7 @@ def infection_stage(GameBoard, Players):
     GameBoard.outbreak_list = []
     #Draw a card from the Infect Deck
     index = GameBoard.infect_deck.pop(0)
+    print index, "was infected."
     #Infect the card's city and update gameBoard
     GameBoard.cities[index].infect(GameBoard, Players)
     #Discard the drawn card to the Infect Discard Pile
@@ -1664,18 +1716,21 @@ def infection_stage(GameBoard, Players):
     GameBoard.outbreak_list = []
     #Rinse and repeat at least once.
     index = GameBoard.infect_deck.pop(0)
+    print index, "was infected."
     GameBoard.cities[index].infect(GameBoard, Players)
     GameBoard.infect_discard.append(index)
     GameBoard.outbreak_list = []
     #If the infection rate is 2 or more, infect one more city
     if GameBoard.infection_rate_marker > 2:
         index = GameBoard.infect_deck.pop(0)
+        print index, "was infected."
         GameBoard.cities[index].infect(GameBoard, Players)
         GameBoard.infect_discard.append(index)
         GameBoard.outbreak_list = []
     #If the Infection Rate is 6 or more, infect a fourth city.
     if GameBoard.infection_rate_marker > 5:
         index = GameBoard.infect_deck.pop(0)
+        print index, "was infected."
         GameBoard.cities[index].infect(GameBoard, Players)
         GameBoard.infect_discard.append(index)
         GameBoard.outbreak_list = []
@@ -1748,7 +1803,7 @@ def move_player(GameBoard, player, destination_name, *args):
     if len(args) == 1:
         #The first optional argument will always be the number of actions the
         #player wishes to spend on movement.
-        steps = args[0]
+        steps = int(args[0])
         #for each action...
         for i in xrange(steps):
             #check to see if the player has enough remaining actions...
@@ -1762,7 +1817,7 @@ def move_player(GameBoard, player, destination_name, *args):
     #another player!
     else:
         #Grab the number of actions the Dispatcher wants to spend...
-        steps = args[0]
+        steps = int(args[0])
         #and the Dispatcher's player object, too, while we're at it.
         dispatcher = args[1]
         #Then, for each action indicated in Steps...
@@ -2107,12 +2162,12 @@ def resilient_population(GameBoard, player, card_to_remove):
     GameBoard.infect_discard.pop(card_to_remove)
     #If the player is a Contingency planner with the card stored...
     if (player.role == "Contingency"):
-        if player.stored == GameBoard.events["Resilient Population"]:
+        if player.stored == "Resilient Population":
             player.stored = 0
     #Otherwise...
     else:
         #place the card in the player discard pile
-        card_index = player.hand.index(GameBoard.events["Resilient Population"])
+        card_index = player.hand.index("Resilient Population")
         GameBoard.player_discard.append(player.hand.pop(cardIndex))
         
 
@@ -2126,13 +2181,13 @@ def airlift(GameBoard, player, target, destination_name):
     target.location = destination_name
     #If the player with the card is a contingency planner who stored the card
     if player.role == "Contingency":
-        if player.stored == GameBoard.events["Airlift"]:
+        if player.stored == "Airlift":
             #Poof it into the e-ther.
             player.stored = 0
     #Otherwise...
     else:
         #place the card in the player discard pile
-        card_index = player.hand.index(GameBoard.events["Airlift"])
+        card_index = player.hand.index("Airlift")
         GameBoard.player_discard.append(player.hand.pop(cardIndex))
 
 
@@ -2167,13 +2222,13 @@ def gov_grant(GameBoard, player, city_name, *args):
     GameBoard.player_discard.append(player.hand.pop(discard_index))
     #If the player's a Contingency planner playing the card from storage
     if player.role == "Contingency":
-        if player.stored == GameBoard.events["Government Grant"]:
+        if player.stored == "Government Grant":
             #VANISH it.
             player.stored = 0
     #otherwise...
     else:
         #place the card in the player discard pile
-        card_index = player.hand.index(GameBoard.events["Government Grant"])
+        card_index = player.hand.index("Government Grant")
         GameBoard.player_discard.append(player.hand.pop(cardIndex))
 
 
@@ -2186,11 +2241,11 @@ def one_quiet_night(GameBoard, player):
     GameBoard.one_quiet_night_marker = 1
     #COntingency Planner card removal
     if player.role == "Contingency":
-        if player.stored == GameBoard.events["One Quiet Night"]:
+        if player.stored == "One Quiet Night":
             player.stored = 0
     else:
         #place the card in the player discard pile
-        card_index = player.hand.index(GameBoard.events["One Quiet Night"])
+        card_index = player.hand.index("One Quiet Night")
         GameBoard.player_discard.append(player.hand.pop(cardIndex))
 
 
@@ -2246,11 +2301,11 @@ def forecast(GameBoard, player):
 
     #Same Contignecny planner stuff.
     if player.role == "Contingency":
-        if player.stored == GameBoard.events["Forecast"]:
+        if player.stored == "Forecast":
             player.stored = 0
     else:
         #place the card in the player discard pile
-        card_index = player.hand.index(GameBoard.events["Forecast"])
+        card_index = player.hand.index("Forecast")
         GameBoard.player_discard.append(player.hand.pop(cardIndex))
 
 
@@ -2459,5 +2514,4 @@ def start():
 def start(players, difficulty):
     Game = Pandemic(players, difficulty)
     Game.draw_board()
-    help()
     play(Game)
