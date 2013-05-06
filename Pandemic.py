@@ -195,7 +195,11 @@ def parse_action(Pandemic, player, input):
         take_knowledge(other_player, player, index)
     elif words[0] == "Treat":
         #Treat
-        home_city.treat(player, Pandemic.GameBoard, words[1])
+        colors = ["blue", "yellow", "black", "red"]
+        if words[1] in colors:
+            home_city.treat(player, Pandemic.GameBoard, words[1])
+        else:
+            home_city.treat(player, Pandemic.GameBoard, words[4], words[1])
     elif words[0] == "Cure":
         #Cure
         if player.role == "Scientist":
@@ -223,7 +227,7 @@ def parse_action(Pandemic, player, input):
             Pandemic.Players[int(words[2])].player_info(Pandemic.GameBoard)
         elif words[1] in Pandemic.GameBoard.city_index:
             #Examine city.
-            Pandemic.GameBoard.cities[words[1]].print_city(GameBoard)
+            Pandemic.GameBoard.cities[words[1]].print_city(Pandemic.GameBoard)
         elif words[1] == "Game":
             Pandemic.draw_board()
         else:
@@ -294,6 +298,8 @@ def help():
     print "another city."
     print
     print "Treat a disease: 'Treat [color of disease tokens] in [name of city]'"
+    print "Treat multiple cubes: 'Treat [number of cubes] cubes of [color of "
+    print "disease tokens] in [name of city]'"
     print "Cure a disease: 'Cure [color of disease] by discarding [first card"
     print "name], [second card name], [third card name], [fourth card name], and"
     print "[fifth card name]*'"
@@ -476,10 +482,9 @@ class City(object):
         self.outbroken = 0
 
     #This method just prints the city's information in an easy-to-read fashion.
-    def print_city(self, GameBoard):
-        self.numbers_to_colors = {0: "Blue", 1: "Yellow", 2: "Black", 3: "Red"}
+    def print_city(self, GameBoard, *args):
         print "Name:            ", self.name
-        print "Color:           ", self.numbers_to_colors[self.color]
+        print "Color:           ", GameBoard.terms[self.color]
         print "U | Y | B | R"
         self.u = str(self.disease_tokens[0])
         self.y = str(self.disease_tokens[1])
@@ -494,22 +499,25 @@ class City(object):
         print "Draw Chance:     ", self.draw_chance
         print "Damage if Drawn: ", self.cubes_placed
         print "Risk Assessment: ", float(self.draw_chance) * self.cubes_placed
-        self.a = ""
+        self.a = "Connections:      "
         for city, distance in self.city_connections.iteritems():
-            self.infected = False
-            self.a += city + " ("
-            for tokens in GameBoard.cities[city].disease_tokens:
-                if tokens > 0:
-                    self.color = GameBoard.cities[city].disease_tokens.index(tokens)
-                    self.a += GameBoard.terms[self.color] + ": "
-                    self.a += str(tokens)
-                    if self.infected:
-                        self.a += " "
-                    self.infected = True
-            if not self.infected:
-                self.a += "uninfected"
-            self.a += ")"
-            if len(self.ciy_connections)
+            if city != self.name:
+                self.infected = False
+                self.a += city + " ("
+                self.city_object = GameBoard.cities[city]
+                for tokens in self.city_object.disease_tokens:
+                    if tokens > 0:
+                        self.diseases = self.city_object.disease_tokens
+                        self.color = self.diseases.index(tokens)
+                        self.a += GameBoard.terms[self.color] + ": "
+                        self.a += str(tokens)
+                        if self.infected:
+                            self.a += " "
+                        self.infected = True
+                if not self.infected:
+                    self.a += "clean"
+                self.a += "), "
+        self.a.strip()
         print self.a
 
 
@@ -667,8 +675,9 @@ class City(object):
 
     #The active player treats one color in this city.  Self is self, player
     #is the player treating the disease, GameBoard is Game Board, and color
-    #is the color of the disease being treated.
-    def treat(self, player, GameBoard, color):
+    #is the color of the disease being treated.  The optional argument is how
+    #many actions the player wishes to spend treating.
+    def treat(self, player, GameBoard, color, *args):
         color_int = GameBoard.terms[color]
         if self == GameBoard.cities[player.location]:
             #If there are no disease cubes of the chosen color, return.
@@ -692,8 +701,14 @@ class City(object):
                 GameBoard.cubes_remaining[color_int] += cubes
                 #and wipe them off the city
                 self.disease_tokens[color_int] = 0
-                player.actions += -1
-                self.assess_risk(GameBoard)
+                #If the disease has been cured...
+                if GameBoard.cures[color_int] > GameBoard.terms["uncured"]:
+                    #Treat for free.
+                    self.assess_risk(GameBoard)
+                #Otherwise, lose an action.
+                else:
+                    player.actions += -1
+                    self.assess_risk(GameBoard)
             #If the player is not a medic and the disease isn't cured
             else:
                 #remove one cube and place it back in the cubes_remaining pool
@@ -701,6 +716,8 @@ class City(object):
                 GameBoard.cubes_remaining[color_int] += 1
                 player.actions += -1
                 self.assess_risk(GameBoard)
+            if len(args) > 0 and int(args[0]) > 0:
+                self.treat(player,GameBoard,color, int(args[0]-1))
 
             
     #The game itself infects the city.  *args are, optionally, the color
@@ -1621,14 +1638,30 @@ class Pandemic(object):
             self.GameBoard.cities[city_name].find_draw_chance(self.GameBoard)
 
     def draw_board(self):
-        for city_tuple in self.GameBoard.cities.iteritems():
-            self.city = self.GameBoard.cities[city_tuple[0]]
+        print
+        self.infected_cities = ""
+        for city_name in self.GameBoard.city_index:
+            self.city = self.GameBoard.cities[city_name]
+            self.infected = False
+            self.a = ""
+            self.a += city_name + " ("
+            for tokens in self.GameBoard.cities[city_name].disease_tokens:
+                if tokens > 0:
+                    self.color = self.city.disease_tokens.index(tokens)
+                    self.a += self.GameBoard.terms[self.color]
+                    self.a += ": "
+                    self.a += str(tokens)
+                    if self.infected:
+                        self.a += " "
+                    self.infected = True
+            self.a += "), "
+            if self.infected:
+                self.infected_cities += self.a
             self.city.print_city(self.GameBoard)
             for i in xrange(len(self.Players)):
-                if self.Players[i].location == city_tuple[0]:
+                if self.Players[i].location == city_name:
                     print self.Players[i].role, "(",i,") is in this city."
             print
-        print
         print "Outbreak Marker: ", self.GameBoard.outbreak_marker
         if self.GameBoard.outbreak_marker > 5:
             print "If the outbreak marker reaches 8, the game ends!"
@@ -1675,20 +1708,26 @@ class Pandemic(object):
         elif self.GameBoard.cures[3] == 2:
             print "Red: Eradicated"
         print
-        print "Cities in the Intensify Pile (likely to be drawn again soon):"
-        for i in self.GameBoard.intensify_list:
-            print i
-        print
-        print "Cities in the Infect Discard Pile:"
-        for i in self.GameBoard.infect_discard:
-            print i
-        print
-        print "Cities in the Player Discard Pile:"
-        for i in self.GameBoard.player_discard:
-            print i
-        print
+        if len(self.GameBoard.intensify_list) > 0:
+            print "Cities in the Intensify Pile (likely to be drawn again soon):"
+            for i in self.GameBoard.intensify_list:
+                print i
+            print
+        if len(self.GameBoard.infect_discard) > 0:
+            print "Cities in the Infect Discard Pile:"
+            for i in self.GameBoard.infect_discard:
+                print i
+            print
+        if len(self.GameBoard.player_discard) > 0:
+            print "Cities in the Player Discard Pile:"
+            for i in self.GameBoard.player_discard:
+                print i
+            print
         for i in self.Players:
             print i.player_info(self.GameBoard)
+        print
+        print "Infected cities:"
+        print self.infected_cities
        
             
 def allowable_actions(active_player, Pandemic):
